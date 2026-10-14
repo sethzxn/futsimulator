@@ -1,0 +1,513 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Carreira — Simulador de Vida</title>
+<style>
+  :root{
+    --bg:#0b0d12; --bg2:#12151d; --glass:rgba(255,255,255,.04); --line:rgba(255,255,255,.08);
+    --txt:#eef0f6; --mut:#8b92a5; --acc:#22d3a0; --acc2:#6366f1; --warn:#f59e0b; --bad:#ef4444;
+    --radius:18px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: radial-gradient(1200px 600px at 10% -10%, #1b2140 0%, transparent 60%),
+                radial-gradient(900px 500px at 110% 10%, #0f3b33 0%, transparent 55%),
+                var(--bg);
+    color:var(--txt); -webkit-font-smoothing:antialiased;
+  }
+  header{
+    position:sticky; top:0; z-index:5; backdrop-filter: blur(12px);
+    background: rgba(11,13,18,.7); border-bottom:1px solid var(--line);
+  }
+  .wrap{max-width:980px;margin:0 auto;padding:16px}
+  .top{display:flex;align-items:center;justify-content:space-between;gap:12px}
+  .brand{font-weight:800;letter-spacing:.3px}
+  .brand span{color:var(--acc)}
+  .tabs{display:flex;gap:6px;overflow:auto;padding:10px 16px 14px;max-width:980px;margin:0 auto}
+  .tab{
+    flex:0 0 auto; padding:8px 14px; border-radius:999px; border:1px solid var(--line);
+    background:var(--glass); color:var(--mut); cursor:pointer; font-weight:600; font-size:.9rem;
+  }
+  .tab.on{color:#06140f;background:linear-gradient(135deg,var(--acc),#7ee7c7);border-color:transparent}
+  .hero{
+    border-radius:var(--radius); padding:22px; margin:16px 0;
+    background: linear-gradient(135deg, rgba(99,102,241,.25), rgba(34,211,160,.18));
+    border:1px solid var(--line);
+  }
+  .hero h2{margin:0 0 4px;font-size:1.5rem}
+  .mut{color:var(--mut)}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+  .card{background:var(--glass);border:1px solid var(--line);border-radius:var(--radius);padding:16px;margin-bottom:14px}
+  .card h3{margin:0 0 10px;font-size:1rem;letter-spacing:.2px}
+  .stat{background:rgba(255,255,255,.03);border:1px solid var(--line);border-radius:14px;padding:12px}
+  .stat b{display:block;font-size:1.25rem;margin-top:4px}
+  .bar{height:6px;border-radius:99px;background:rgba(255,255,255,.07);overflow:hidden;margin-top:8px}
+  .bar i{display:block;height:100%;background:linear-gradient(90deg,var(--acc2),var(--acc))}
+  .btns{display:flex;flex-wrap:wrap;gap:8px}
+  button.b{
+    border:1px solid var(--line); background:rgba(255,255,255,.05); color:var(--txt);
+    padding:10px 14px; border-radius:12px; cursor:pointer; font-size:.92rem; text-align:left;
+    transition:transform .08s, border-color .2s;
+  }
+  button.b:hover{border-color:var(--acc)}
+  button.b:active{transform:scale(.98)}
+  button.b:disabled{opacity:.4;cursor:not-allowed;border-color:var(--line)}
+  button.b small{display:block;color:var(--mut);margin-top:3px}
+  button.primary{background:linear-gradient(135deg,var(--acc2),var(--acc));color:#fff;border:0}
+  .pill{display:inline-block;padding:3px 9px;border-radius:999px;font-size:.78rem;border:1px solid var(--line);color:var(--mut);margin:2px}
+  .log p{margin:8px 0;padding-left:12px;border-left:2px solid var(--line)}
+  .ev{border:1px solid rgba(245,158,11,.35);background:linear-gradient(180deg,rgba(245,158,11,.10),rgba(255,255,255,.02))}
+  .ev h3{color:var(--warn)}
+  .good{color:var(--acc)} .bad{color:var(--bad)}
+  .row{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:8px 0;border-bottom:1px dashed var(--line)}
+  .row:last-child{border-bottom:0}
+  @media (max-width:520px){ .hero h2{font-size:1.25rem} }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap top">
+    <div class="brand">Carreira<span>.</span></div>
+    <div class="mut" id="hdr"></div>
+  </div>
+  <nav class="tabs" id="tabs"></nav>
+</header>
+
+<main class="wrap" id="app"></main>
+
+<script>
+/* =========================================================
+   DADOS FICTÍCIOS. Nomes, clubes e marcas são inventados.
+   Quando houver dados reais, este bloco é o único que muda.
+   ========================================================= */
+const DADOS = {
+  nomes: ["Lucas","Mateus","Gabriel","Rafael","Thiago","Bruno","Caio","Vinícius","Felipe","Diego","Enzo","Matheus"],
+  sobrenomes: ["Almeida","Teixeira","Moreira","Rocha","Barros","Fonseca","Ribeiro","Carvalho","Dias","Nogueira"],
+  clubes: [
+    { id:"valmont", nome:"Valmont FC", nivel:1 },
+    { id:"alvorada", nome:"Alvorada Atlético", nivel:2 },
+    { id:"serrano", nome:"Serrano Esporte Clube", nivel:3 },
+  ],
+  veiculos: [
+    { id:"moto", nome:"Moto usada", preco:6000, manut:40, bonus:{felicidade:2} },
+    { id:"hatch", nome:"Hatch popular", preco:35000, manut:120, bonus:{felicidade:4} },
+    { id:"sedan", nome:"Sedã confortável", preco:90000, manut:220, bonus:{felicidade:6, reputacao:2} },
+    { id:"suv", nome:"SUV de luxo", preco:260000, manut:500, bonus:{felicidade:8, reputacao:6} },
+  ],
+  casas: [
+    { id:"apto", nome:"Apartamento simples", preco:120000, aluguelEvitado:900, bonus:{felicidade:4, estresse:-4} },
+    { id:"casa", nome:"Casa de bairro", preco:350000, aluguelEvitado:2000, bonus:{felicidade:8, estresse:-8} },
+    { id:"mans", nome:"Mansão", preco:1800000, aluguelEvitado:9000, bonus:{felicidade:14, estresse:-12, reputacao:8} },
+  ],
+};
+
+/* Treinos e atividades. Cada um custa energia/forma e dá ganhos. */
+const TREINOS = [
+  { id:"fisico", nome:"Treino físico", desc:"Ganha resistência e velocidade", ganha:["resistencia","velocidade"], custo:{forma:-6,estresse:+5} },
+  { id:"finalizacao", nome:"Treino de finalização", desc:"Chutes e posicionamento na área", ganha:["finalizacao"], custo:{forma:-4,estresse:+3} },
+  { id:"passe", nome:"Treino de passe", desc:"Visão de jogo e passe", ganha:["passe","visao"], custo:{forma:-3,estresse:+3} },
+  { id:"drible", nome:"Treino de drible", desc:"Controle de bola e condução", ganha:["drible"], custo:{forma:-4,estresse:+4} },
+  { id:"defesa", nome:"Treino defensivo", desc:"Marcação e posicionamento", ganha:["defesa"], custo:{forma:-4,estresse:+3} },
+  { id:"academia", nome:"Academia", desc:"Musculação e preparo", ganha:["resistencia"], custo:{forma:-5,estresse:+4}, extra:{saude:+1} },
+  { id:"estudo", nome:"Estudar", desc:"Reforça disciplina e futuro fora do campo", ganha:[], custo:{forma:-1,estresse:+4}, extra:{disciplina:+2,estudo:+3} },
+];
+
+const ATIVIDADES = [
+  { id:"descanso", nome:"Descansar", desc:"Recupera forma e reduz estresse", efeito:{forma:+8,estresse:-8} },
+  { id:"familia", nome:"Tempo com a família", desc:"Melhora relação com a família", efeito:{felicidade:+4,estresse:-3,rel_familia:+4} },
+  { id:"amigos", nome:"Sair com os amigos", desc:"Diversão e vínculo social", efeito:{felicidade:+6,forma:-3,rel_amigos:+4} },
+  { id:"festa", nome:"Festa", desc:"Muita diversão, mas cansa", efeito:{felicidade:+10,forma:-8,estresse:-4,reputacao:+1} },
+  { id:"lazer", nome:"Lazer tranquilo", desc:"Ler, jogar, relaxar", efeito:{felicidade:+3,estresse:-5} },
+];
+
+/* Eventos com escolhas. Podem exigir condições e gerar consequências futuras (flags). */
+const EVENTOS = [
+  {
+    id:"proposta", peso:3, cond:s=>s.semana>=10,
+    titulo:"Proposta de outro clube",
+    texto:"Um clube de divisão maior quer você. A proposta exige mudar de cidade.",
+    opcoes:[
+      { t:"Aceitar a proposta", efeito:{reputacao:+6,felicidade:-6,dinheiro:+3000,rel_familia:-3}, log:"Você se mudou e começou em um clube maior." , mudaClube:1 },
+      { t:"Recusar e continuar", efeito:{felicidade:+3,disciplina:+1}, log:"Você ficou onde estava e manteve a rotina." },
+    ]
+  },
+  {
+    id:"festa_vizinho", peso:2, cond:s=>s.semana>=4,
+    titulo:"Convite para uma festa",
+    texto:"Uma festa na véspera do jogo decisivo. Um colega comenta que vai ter fotos.",
+    opcoes:[
+      { t:"Ir e curtir", efeito:{felicidade:+8,forma:-10,reputacao:+2}, log:"A noite foi boa, mas o corpo sentiu.", chance:{p:0.3, flag:"foto_viral"} },
+      { t:"Recusar e treinar", efeito:{forma:+4,estresse:+2,disciplina:+1}, log:"Você ficou em casa e treinou." },
+    ]
+  },
+  {
+    id:"lesao", peso:1, cond:s=>s.corpo.forma<50,
+    titulo:"Dor no joelho",
+    texto:"Depois de treinos puxados, o joelho começa a incomodar.",
+    opcoes:[
+      { t:"Procurar um médico", efeito:{saude:+5,dinheiro:-800}, log:"O médico pediu repouso e acompanhamento." },
+      { t:"Ignorar e continuar", efeito:{saude:-10,forma:-5}, log:"A dor piorou um pouco." , flag:"lesao_risco" },
+    ]
+  },
+  {
+    id:"familia_briga", peso:2, cond:s=>s.idade>=15,
+    titulo:"Briga em casa",
+    texto:"Seu pai quer que você largue o futebol e estude. A discussão esquentou.",
+    opcoes:[
+      { t:"Ceder e estudar", efeito:{disciplina:+3,rel_familia:+3,felicidade:-4}, log:"Você aceitou e passou a estudar mais." },
+      { t:"Insistir no futebol", efeito:{felicidade:+2,rel_familia:-6,estresse:+5}, log:"A família ficou chateada, mas você seguiu." },
+    ]
+  },
+  {
+    id:"bonus", peso:2, cond:s=>s.stats.gols>=2,
+    titulo:"Prêmio de gol",
+    texto:"Um patrocinador quer dar um prêmio por seus gols recentes.",
+    opcoes:[
+      { t:"Aceitar o dinheiro", efeito:{dinheiro:+2500,reputacao:+2} , log:"Você recebeu o prêmio."},
+      { t:"Pedir um contrato de imagem", efeito:{reputacao:+5,dinheiro:+500}, log:"Você fechou um contrato de imagem.", flag:"contrato_imagem" },
+    ]
+  },
+  {
+    id:"viral", peso:1, cond:s=>s.flags.foto_viral && !s.flags.viral_ok,
+    titulo:"Foto viralizou",
+    texto:"Uma foto sua da festa está circulando nas redes. Você precisa responder.",
+    opcoes:[
+      { t:"Pedir desculpas", efeito:{reputacao:-4,felicidade:-3}, log:"Você se desculpou e o assunto passou.", flag:"viral_ok" },
+      { t:"Ignorar", efeito:{reputacao:-8,estresse:+8}, log:"O assunto cresceu nas redes.", flag:"viral_ok" },
+    ]
+  },
+  {
+    id:"amigo_pede", peso:2, cond:s=>s.semana>=8,
+    titulo:"Amigo pede dinheiro",
+    texto:"Um amigo de infância precisa de ajuda com uma dívida.",
+    opcoes:[
+      { t:"Emprestar", efeito:{dinheiro:-1500,rel_amigos:+6}, log:"Você emprestou, e o amigo agradeceu." },
+      { t:"Recusar", efeito:{rel_amigos:-6,estresse:+2}, log:"Ele ficou chateado." },
+    ]
+  },
+];
+
+/* Compras e carreira */
+const CONTRATO = { salarioBase: 800, bonusTitulo: 3000 };
+
+/* =========================================================
+   ESTADO
+   ========================================================= */
+const SAVE = "carreira-v2";
+const IDADE_INI = 14;
+const IDADE_MAX = 45;
+
+const r = (a,b)=>Math.floor(Math.random()*(b-a+1))+a;
+const pick = a => a[r(0,a.length-1)];
+const clamp = (v,a,b)=>Math.max(a,Math.min(b,v));
+
+function novo(){
+  const at = {}; ["finalizacao","passe","drible","defesa","velocidade","resistencia","visao"].forEach(k=>at[k]=r(28,48));
+  return {
+    nome: `${pick(DADOS.nomes)} ${pick(DADOS.sobrenomes)}`,
+    idade: IDADE_INI, semana:1, ano:2026,
+    at,
+    corpo: { saude:90, forma:65 },
+    mente: { felicidade:60, estresse:20, disciplina:r(30,70), reputacao:10 },
+    rel: { familia:50, amigos:50 },
+    estudo: 0,
+    vida: { dinheiro: 1200, veiculos:[], casa:null, aluguel:800 },
+    carreira: { clube: DADOS.clubes[0].nome, nivel:1, salario: CONTRATO.salarioBase, titulos:0 },
+    stats: { jogos:0, gols:0, assist:0, notas:[] },
+    flags: {},
+    historico: [],
+    tela: "inicio",
+  };
+}
+
+let P = null;
+function salvar(){ localStorage.setItem(SAVE, JSON.stringify(P)); }
+function carregar(){ try{ const s=localStorage.getItem(SAVE); return s?JSON.parse(s):null; }catch{ return null; } }
+
+/* ---------- Aplicação de efeitos ---------- */
+function aplicar(e){
+  if(!e) return;
+  for(const k in e){
+    const v = e[k];
+    switch(k){
+      case "forma": P.corpo.forma = clamp(P.corpo.forma+v,0,100); break;
+      case "saude": P.corpo.saude = clamp(P.corpo.saude+v,0,100); break;
+      case "felicidade": P.mente.felicidade = clamp(P.mente.felicidade+v,0,100); break;
+      case "estresse": P.mente.estresse = clamp(P.mente.estresse+v,0,100); break;
+      case "disciplina": P.mente.disciplina = clamp(P.mente.disciplina+v,0,100); break;
+      case "reputacao": P.mente.reputacao = clamp(P.mente.reputacao+v,0,100); break;
+      case "rel_familia": P.rel.familia = clamp(P.rel.familia+v,0,100); break;
+      case "rel_amigos": P.rel.amigos = clamp(P.rel.amigos+v,0,100); break;
+      case "dinheiro": P.vida.dinheiro += v; break;
+      case "estudo": P.estudo += v; break;
+    }
+  }
+}
+
+function log(txt, tipo){ P.historico.push({t:txt, tipo:tipo||"", s:P.semana, a:P.ano}); if(P.historico.length>250) P.historico.shift(); }
+
+/* ---------- Carreira: partidas ---------- */
+function partida(){
+  const a = P.at;
+  const pGol = clamp(10 + (a.finalizacao-50)*0.4 + P.corpo.forma*0.1 - P.mente.estresse*0.1, 3, 40)/100;
+  const pAss = clamp(14 + (a.passe-50)*0.4 + P.corpo.forma*0.1 - P.mente.estresse*0.1, 5, 45)/100;
+  const gol = Math.random()<pGol;
+  const ass = !gol && Math.random()<pAss;
+  const nota = clamp(5 + (gol?2:0) + (ass?1:0) + (Math.random()*2.4-1.2) + (P.corpo.forma-60)/60, 0, 10);
+  P.stats.jogos++; if(gol) P.stats.gols++; if(ass) P.stats.assist++;
+  P.stats.notas.push(Number(nota.toFixed(1)));
+  P.vida.dinheiro += CONTRATO.salarioBase * 0 + P.carreira.salario * 0.25; // prêmio de jogo
+  log(`Partida: nota ${nota.toFixed(1)}${gol?" · ⚽ gol":""}${ass?" · 🅰️ assistência":""}`, "jogo");
+}
+
+/* ---------- Escolhas da semana ---------- */
+function fazerTreino(id){
+  const t = TREINOS.find(x=>x.id===id);
+  const ganhoBase = 1 + (P.mente.disciplina>60?1:0);
+  if(t.ganha.length){
+    for(const k of t.ganha){ if(P.at[k]!==undefined) P.at[k] = clamp(P.at[k]+(Math.random()<0.6?ganhoBase:0),0,99); }
+  }
+  aplicar(t.custo);
+  if(t.extra?.saude) aplicar({saude:t.extra.saude});
+  if(t.extra?.disciplina) aplicar({disciplina:t.extra.disciplina});
+  if(t.extra?.estudo) aplicar({estudo:t.extra.estudo});
+  log(`Treino: ${t.nome}`, "treino");
+  return t;
+}
+function fazerAtividade(id){
+  const a = ATIVIDADES.find(x=>x.id===id);
+  const e = {...a.efeito};
+  if(e.rel_familia) P.rel.familia = clamp(P.rel.familia+e.rel_familia,0,100), delete e.rel_familia;
+  if(e.rel_amigos) P.rel.amigos = clamp(P.rel.amigos+e.rel_amigos,0,100), delete e.rel_amigos;
+  aplicar(e);
+  log(`${a.nome}: ${a.desc}`, "atividade");
+}
+
+/* ---------- Eventos ---------- */
+function sortearEvento(){
+  const elegiveis = EVENTOS.filter(ev => {
+    try { return ev.cond(P); } catch { return false; }
+  });
+  if(!elegiveis.length) return null;
+  const total = elegiveis.reduce((s,e)=>s+e.peso,0);
+  let x = Math.random()*total;
+  for(const ev of elegiveis){ x-=ev.peso; if(x<=0) return ev; }
+  return elegiveis[0];
+}
+
+function resolverEvento(ev, idx){
+  const op = ev.opcoes[idx];
+  aplicar(op.efeito);
+  if(op.mudaClube){
+    const prox = DADOS.clubes.find(c=>c.nivel>P.carreira.nivel);
+    if(prox){ P.carreira.clube = prox.nome; P.carreira.nivel = prox.nivel; P.carreira.salario = Math.round(P.carreira.salario*1.6); }
+  }
+  if(op.flag) P.flags[op.flag] = true;
+  if(op.chance && Math.random()<op.chance.p) P.flags[op.chance.flag] = true;
+  log(op.log || op.t, "evento");
+  P.eventoAtual = null;
+  salvar(); render();
+}
+
+/* ---------- Compras ---------- */
+function comprar(tipo, id){
+  const lista = tipo==="veiculo"?DADOS.veiculos:DADOS.casas;
+  const item = lista.find(x=>x.id===id);
+  if(P.vida.dinheiro < item.preco){ alert("Dinheiro insuficiente."); return; }
+  if(tipo==="veiculo"){
+    if(P.vida.veiculos.includes(id)){ alert("Você já tem esse veículo."); return; }
+    P.vida.dinheiro -= item.preco; P.vida.veiculos.push(id);
+  } else {
+    if(P.vida.casa===id){ alert("Você já tem essa casa."); return; }
+    P.vida.dinheiro -= item.preco; P.vida.casa = id;
+  }
+  aplicar(item.bonus);
+  if(item.bonus?.estresse) {}
+  log(`Comprou: ${item.nome}`, "compra");
+  salvar(); render();
+}
+
+/* ---------- Semana ---------- */
+function encerrarSemana(){
+  // manutenção, moradia e salário
+  let custo = 0;
+  for(const id of P.vida.veiculos){ custo += DADOS.veiculos.find(v=>v.id===id).manut/4; }
+  if(P.vida.casa){ custo += 0; } else { custo += P.vida.aluguel/4; }
+  P.vida.dinheiro -= Math.round(custo);
+  P.vida.dinheiro += Math.round(P.carreira.salario/4);
+
+  // degradação natural
+  P.corpo.forma = clamp(P.corpo.forma-1,0,100);
+  P.mente.estresse = clamp(P.mente.estresse-1,0,100);
+  if(P.corpo.saude < 60) P.mente.felicidade = clamp(P.mente.felicidade-1,0,100);
+
+  // nova semana
+  P.semana++;
+  if(P.semana > 52){ P.semana = 1; P.idade++; P.ano++; log(`Aniversário: agora você tem ${P.idade} anos.`, "idade"); }
+  salvar();
+}
+
+function proximaSemana(){
+  encerrarSemana();
+  P.eventoAtual = null;
+  if(Math.random()<0.4) P.eventoAtual = sortearEvento();
+  render();
+}
+
+/* ---------- Telas ---------- */
+const TELAS = [
+  {id:"inicio", nome:"Início"},
+  {id:"treino", nome:"Treino"},
+  {id:"vida", nome:"Vida"},
+  {id:"compras", nome:"Compras"},
+  {id:"carreira", nome:"Carreira"},
+  {id:"historico", nome:"Histórico"},
+];
+
+function barra(v){ return `<div class="bar"><i style="width:${v}%"></i></div>`; }
+
+function renderHeader(){
+  document.getElementById("hdr").textContent = P ? `${P.nome} · ${P.idade} anos · sem. ${P.semana}/${P.ano}` : "";
+  document.getElementById("tabs").innerHTML = P ? TELAS.map(t=>`<button class="tab ${P.tela===t.id?"on":""}" onclick="ir('${t.id}')">${t.nome}</button>`).join("") : "";
+}
+
+function ir(t){ P.tela=t; salvar(); render(); }
+
+function render(){
+  renderHeader();
+  const app = document.getElementById("app");
+  if(!P){
+    app.innerHTML = `
+      <div class="hero"><h2>Sua vida, sua carreira</h2>
+      <p class="mut">Você começa aos 14 anos na base de um clube fictício. Cada semana é uma decisão.</p>
+      <button class="b primary" onclick="novaCarreira()">Começar</button></div>`;
+    return;
+  }
+  if(P.idade >= IDADE_MAX){ return aposentar(); }
+
+  const fn = {inicio:telaInicio, treino:telaTreino, vida:telaVida, compras:telaCompras, carreira:telaCarreira, historico:telaHistorico}[P.tela] || telaInicio;
+  app.innerHTML = fn();
+}
+
+function telaInicio(){
+  const ev = P.eventoAtual ? `
+    <div class="card ev">
+      <h3>${P.eventoAtual.titulo}</h3>
+      <p>${P.eventoAtual.texto}</p>
+      <div class="btns">${P.eventoAtual.opcoes.map((o,i)=>`<button class="b" onclick="resolverEventoAtual(${i})">${o.t}</button>`).join("")}</div>
+    </div>` : "";
+  return `
+    <section class="hero">
+      <h2>${P.nome}</h2>
+      <p class="mut">${P.carreira.clube} · ${P.idade} anos · R$ ${P.vida.dinheiro.toLocaleString("pt-BR")}</p>
+      <div class="btns" style="margin-top:12px">
+        <button class="b primary" onclick="proximaSemana()">Avançar semana →</button>
+        <button class="b" onclick="ir('treino')">Treinar</button>
+      </div>
+    </section>
+    ${ev}
+    <div class="grid">
+      ${statBox("Forma", P.corpo.forma)}
+      ${statBox("Saúde", P.corpo.saude)}
+      ${statBox("Felicidade", P.mente.felicidade)}
+      ${statBox("Estresse", P.mente.estresse)}
+    </div>`;
+}
+
+function statBox(nome, v){ return `<div class="stat"><span class="mut">${nome}</span><b>${v}</b>${barra(v)}</div>`; }
+
+function resolverEventoAtual(i){ resolverEvento(P.eventoAtual, i); }
+
+function telaTreino(){
+  return `
+    <div class="card"><h3>Treinos</h3>
+      <div class="btns">${TREINOS.map(t=>`<button class="b" onclick="treinar('${t.id}')">${t.nome}<small>${t.desc}</small></button>`).join("")}</div>
+    </div>
+    <div class="card"><h3>Atividades</h3>
+      <div class="btns">${ATIVIDADES.map(a=>`<button class="b" onclick="atividade('${a.id}')">${a.nome}<small>${a.desc}</small></button>`).join("")}</div>
+    </div>
+    <div class="card"><h3>Seus atributos</h3>
+      <div class="grid">${Object.entries(P.at).map(([k,v])=>statBox(k,v)).join("")}</div>
+    </div>`;
+}
+function treinar(id){ fazerTreino(id); salvar(); render(); }
+function atividade(id){ fazerAtividade(id); salvar(); render(); }
+
+function telaVida(){
+  return `
+    <div class="card"><h3>Relações</h3>
+      <div class="grid">${statBox("Família", P.rel.familia)}${statBox("Amigos", P.rel.amigos)}${statBox("Reputação", P.mente.reputacao)}${statBox("Disciplina", P.mente.disciplina)}</div>
+    </div>
+    <div class="card"><h3>Moradia</h3>
+      <div class="row"><span>${P.vida.casa ? DADOS.casas.find(c=>c.id===P.vida.casa).nome : "Morando de aluguel"}</span><span class="mut">${P.vida.casa ? "" : "R$ "+P.vida.aluguel+"/mês"}</span></div>
+    </div>
+    <div class="card"><h3>Veículos</h3>
+      ${P.vida.veiculos.length ? P.vida.veiculos.map(id=>`<div class="row"><span>${DADOS.veiculos.find(v=>v.id===id).nome}</span><span class="mut">manutenção R$ ${DADOS.veiculos.find(v=>v.id===id).manut}/mês</span></div>`).join("") : `<p class="mut">Nenhum veículo ainda.</p>`}
+    </div>
+    <div class="card"><h3>Estudo</h3><p class="mut">Pontos de estudo: <b>${P.estudo}</b></p></div>`;
+}
+
+function telaCompras(){
+  return `
+    <div class="card"><h3>Veículos</h3>
+      <div class="btns">${DADOS.veiculos.map(v=>`<button class="b" ${P.vida.dinheiro<v.preco||P.vida.veiculos.includes(v.id)?"disabled":""} onclick="comprar('veiculo','${v.id}')">${v.nome}<small>R$ ${v.preco.toLocaleString("pt-BR")} · manutenção R$ ${v.manut}/mês</small></button>`).join("")}</div>
+    </div>
+    <div class="card"><h3>Moradia</h3>
+      <div class="btns">${DADOS.casas.map(c=>`<button class="b" ${P.vida.dinheiro<c.preco||P.vida.casa===c.id?"disabled":""} onclick="comprar('casa','${c.id}')">${c.nome}<small>R$ ${c.preco.toLocaleString("pt-BR")} · evita aluguel</small></button>`).join("")}</div>
+    </div>`;
+}
+
+function telaCarreira(){
+  const n = P.stats.notas;
+  const media = n.length ? (n.reduce((a,b)=>a+b,0)/n.length).toFixed(2) : "–";
+  return `
+    <div class="grid">
+      ${statBox("Jogos", P.stats.jogos)}${statBox("Gols", P.stats.gols)}${statBox("Assistências", P.stats.assist)}${statBox("Nota média", media)}
+    </div>
+    <div class="card" style="margin-top:14px"><h3>Clube</h3>
+      <p class="mut">${P.carreira.clube} · salário base R$ ${P.carreira.salario}/mês</p>
+      <div class="btns" style="margin-top:10px"><button class="b" onclick="aposentarAgora()">Aposentar agora</button></div>
+    </div>
+    <div class="card"><h3>Atributos</h3><div class="grid">${Object.entries(P.at).map(([k,v])=>statBox(k,v)).join("")}</div></div>`;
+}
+
+function telaHistorico(){
+  const itens = [...P.historico].reverse().slice(0,80).map(h=>`<p>${h.s?`<span class="mut">S${h.s}/${h.a}</span> · `:""}${h.t}</p>`).join("");
+  return `<div class="card log">${itens || "<p class='mut'>Nada ainda.</p>"}</div>`;
+}
+
+/* ---------- Fim ---------- */
+function aposentar(){
+  const n = P.stats.notas;
+  const media = n.length ? (n.reduce((a,b)=>a+b,0)/n.length).toFixed(2) : "–";
+  P.fim = true;
+  app().innerHTML = `
+    <section class="hero">
+      <h2>Aposentadoria</h2>
+      <p class="mut">${P.nome} encerra a carreira aos ${P.idade} anos.</p>
+    </section>
+    <div class="grid">
+      ${statBox("Jogos", P.stats.jogos)}${statBox("Gols", P.stats.gols)}${statBox("Assistências", P.stats.assist)}${statBox("Nota média", media)}
+    </div>
+    <div class="card" style="margin-top:14px"><h3>Biografia</h3>
+      <p class="mut">Clube: ${P.carreira.clube}. Veículos: ${P.vida.veiculos.length}. Moradia: ${P.vida.casa?"própria":"alugada"}. Reputação: ${P.mente.reputacao}.</p>
+    </div>
+    <div class="btns"><button class="b primary" onclick="novaCarreira()">Nova carreira</button></div>`;
+  localStorage.removeItem(SAVE);
+}
+function app(){ return document.getElementById("app"); }
+function aposentarAgora(){ if(confirm("Encerrar a carreira agora?")) aposentar(); }
+
+function novaCarreira(){ P = novo(); P.tela="inicio"; salvar(); render(); }
+
+/* ---------- Inicialização ---------- */
+P = carregar();
+if(P && P.fim) P = null;
+render();
+</script>
+</body>
+</html>
