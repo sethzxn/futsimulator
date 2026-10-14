@@ -114,8 +114,17 @@
   .hero h2{font-weight:900;font-size:clamp(26px,4.5vw,40px);letter-spacing:-.5px}
   .hero .mut{color:#c4c4cc}
   .kicker{font-family:var(--title);font-size:12px;font-weight:800;letter-spacing:2px;text-transform:uppercase}
-  .card{background:var(--paper);border-color:var(--line)}
+  .card{background:var(--paper);border-color:var(--line);border-top:2px solid var(--gold);border-radius:6px}
+  .card h3{font-family:'Bebas Neue',var(--title);font-size:20px;font-weight:400;letter-spacing:1.5px;color:var(--gold)}
+  .hero h2,.brand,.kicker,.sec-num{font-family:'Bebas Neue',var(--title);letter-spacing:1.5px;text-transform:uppercase}
+  .hero h2{font-size:clamp(40px,7vw,64px);font-weight:400;line-height:.95}
+  .brand{font-size:30px;font-weight:400}
   .stat b{color:var(--ink)}
+  /* minigame de pênalti */
+  .pen-meter{height:18px;border-radius:9px;background:linear-gradient(90deg,#7f1d1d,#a16207 35%,#15803d 50%,#a16207 65%,#7f1d1d);position:relative;margin:12px 0}
+  .pen-needle{position:absolute;top:-4px;width:4px;height:26px;background:#fff;border-radius:2px;left:0}
+  .pen-alvos{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+  .pen-alvos button.b.on{border-color:var(--gold);background:#221c06}
   button.b{background:var(--paper2);color:var(--ink);border-color:var(--line2)}
   button.b:hover{border-color:var(--gold);background:#221c06}
   button.b:disabled{background:var(--paper)}
@@ -166,7 +175,7 @@
     .tk-track{font-size:11px}
   }
 </style>
-<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Kaushan+Script&family=Archivo:wdth,wght@62..125,400..900&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Kaushan+Script&family=Archivo:wdth,wght@62..125,400..900&family=Bebas+Neue&display=swap" rel="stylesheet">
 </head>
 <body>
 <header>
@@ -228,6 +237,16 @@ const ATIVIDADES = [
 ];
 
 const EVENTOS = [
+  { id:"momento_decisivo", peso:2, cond:s=>s.semana>=2,
+    titulo:"Momento decisivo", texto:"O juiz marca contra e o estádio explode. Dá pra ir pra cima dele — ou engolir e voltar pro jogo.",
+    opcoes:[
+      {t:"Reclamar na cara dele", efeito:{reputacao:-2,estresse:-1}, fx:()=>{ P.mente.disciplina = clamp((P.mente.disciplina||50)-3,0,100); P.rel.treinador = clamp(P.rel.treinador-2,0,100); }, log:"Você foi pra cima do árbitro. A torcida rugiu, e o técnico passou a semana falando disso."},
+      {t:"Engolir e jogar", efeito:{estresse:+2,felicidade:+1}, fx:()=>{ P.rel.treinador = clamp(P.rel.treinador+2,0,100); }, log:"Você engoliu a marcação e voltou pro jogo. O técnico notou a cabeça no lugar."} ]},
+  { id:"rumor_transferencia", peso:1, cond:s=>s.semana>=10 && s.mente.reputacao>=20,
+    titulo:"Rumor de transferência", texto:"A imprensa diz que um clube de outra divisão está monitorando você. Seu empresário quer saber o que fazer.",
+    opcoes:[
+      {t:"Mandar o empresário sondar", efeito:{estresse:+2,reputacao:+2}, log:"Seu empresário começou a sondar o mercado."},
+      {t:"Ignorar e focar no clube", efeito:{felicidade:+2}, fx:()=>{ P.rel.treinador = clamp(P.rel.treinador+1,0,100); }, log:"Você ignorou os rumores e focou no time."} ]},
   { id:"conversa_futuro", peso:2, cond:s=>s.par && s.par.status==="namoro",
     titulo:"Conversa sobre o futuro", texto:"Seu namoro chega a um ponto de decisão: morar junto ou manter cada um na sua casa?",
     opcoes:[
@@ -501,7 +520,38 @@ function avatarHTML(p){
 }
 
 let C = null; // estado do criador
-const PASSOS = ["Identidade","Aparência","Origem","História"];
+const PASSOS = ["Identidade","Aparência","Origem","Draft","História"];
+const DRAFT_ATRIBUTOS = [
+  {k:"velocidade",nome:"Velocidade"}, {k:"finalizacao",nome:"Finalização"}, {k:"passe",nome:"Passe"},
+  {k:"drible",nome:"Drible"}, {k:"defesa",nome:"Defesa"}, {k:"resistencia",nome:"Físico"}, {k:"visao",nome:"Visão"},
+];
+const DRAFT_LEGENDS_QTD = 8;
+function iniciarDraft(){
+  const nomes = [...LENDAS].sort(()=>Math.random()-0.5).slice(0, DRAFT_LEGENDS_QTD).map(l=>l.nome);
+  C.draft = { lendas: nomes.map(n=>({nome:n, valores: Object.fromEntries(DRAFT_ATRIBUTOS.map(a=>[a.k, r(55,95)]))})), escolhas: [] };
+}
+function escolherDraft(k){
+  const lenda = C.draft.lendas[C.draft.escolhas.length];
+  if(!lenda) return;
+  C.draft.escolhas.push({lenda:lenda.nome, attr:k, valor:lenda.valores[k]});
+  render();
+}
+function desfazerDraft(){ if(C.draft?.escolhas.length){ C.draft.escolhas.pop(); render(); } }
+function passoDraft(){
+  if(!C.draft) iniciarDraft();
+  const d = C.draft; const n = d.escolhas.length;
+  if(n >= DRAFT_LEGENDS_QTD){
+    const resumo = d.escolhas.map(e=>`<li>${e.lenda}: <b>${DRAFT_ATRIBUTOS.find(a=>a.k===e.attr).nome}</b> ${e.valor}</li>`).join("");
+    return `<p class="mut">Você roubou um atributo de cada lenda. Esses atributos sobem no seu personagem.</p><ul>${resumo}</ul>
+      <div class="btns"><button class="b" onclick="desfazerDraft()">Desfazer última escolha</button></div>`;
+  }
+  const lenda = d.lendas[n];
+  return `
+    <p class="mut">Lenda ${n+1} de ${DRAFT_LEGENDS_QTD}: escolha um atributo para roubar. O valor da lenda indica o quanto ele sobe no seu personagem.</p>
+    <h3 style="margin-top:8px">${lenda.nome}</h3>
+    <div class="opts">${DRAFT_ATRIBUTOS.map(a=>`<div class="opt" onclick="escolherDraft('${a.k}')">${a.nome} <b>${lenda.valores[a.k]}</b></div>`).join("")}</div>
+    ${n>0?`<div class="btns" style="margin-top:12px"><button class="b" onclick="desfazerDraft()">Voltar</button></div>`:""}`;
+}
 
 function iniciarCriador(){
   C = {
@@ -608,6 +658,7 @@ function validarPasso(){
     if(!C.nome || !C.sobrenome){ alert("Preencha nome e sobrenome."); return false; }
     if(!C.cidade){ alert("Informe a cidade onde nasceu."); return false; }
   }
+  if(C.passo===3 && (C.draft?.escolhas.length||0) < DRAFT_LEGENDS_QTD){ alert("Complete o draft escolhendo um atributo de cada lenda."); return false; }
   return true;
 }
 
@@ -649,6 +700,8 @@ function criarPersonagem(){
   const origem = DADOS.origens[C.origem];
   const clubeEscolhido = DADOS.clubes.find(c=>c.id===C.clubeBase) || DADOS.clubes[0];
   const at = {}; ["finalizacao","passe","drible","defesa","velocidade","resistencia","visao"].forEach(k=>at[k]=r(28,48));
+  // draft: cada atributo roubado de uma lenda soma parte do valor dela ao personagem
+  for(const e of (C.draft?.escolhas||[])) at[e.attr] = clamp(at[e.attr] + Math.round((e.valor-50)*0.25), 20, 80);
   P = {
     perfil: {
       nome: `${C.nome} ${C.sobrenome}`,
@@ -840,7 +893,27 @@ function gerarTemporada(){
     forca: Object.fromEntries(times.map(n => [n, r(42,68)])),
   };
   P.liga.forca[nomeP] = clamp(P.liga.forca[nomeP] ?? 52, 42, 68);
+  P.liga.metas = [
+    {id:"meio", texto:`Terminar na primeira metade da tabela (até ${Math.ceil(times.length/2)}º)`, alvo:Math.ceil(times.length/2)},
+    {id:"gols", texto:"Marcar 8 gols na temporada", alvo:8},
+  ];
   P.calendario = gerarCalendario(times);
+}
+
+// Posição atual do clube na tabela (1 = líder).
+function posicaoAtual(){
+  const tab = [...(P.liga?.tabela||[])].sort((a,b)=> b.pts-a.pts || (b.gp-b.gc)-(a.gp-a.gc));
+  return tab.findIndex(t=>t.nome===P.carreira.clube)+1;
+}
+// Progresso de uma meta: { ok, atual } — "atual" é o que o jogador já conseguiu.
+function progressoMeta(m){
+  if(m.id==="gols") return { ok:(P.temp?.gols||0) >= m.alvo, atual:P.temp?.gols||0 };
+  if(m.id==="meio"){ const p=posicaoAtual(); return { ok:p>0 && p<=m.alvo, atual:p }; }
+  return { ok:false, atual:0 };
+}
+// Poder de barganha em negociações de contrato: reputação, humor com o treinador e confiança.
+function poderBarganha(){
+  return clamp(0.2 + (P.mente.reputacao||0)/200 + ((P.rel?.treinador??50)-50)/250, 0.1, 0.9);
 }
 
 function forcaTime(n){ return P.liga?.forca?.[n] ?? 50; }
@@ -1560,16 +1633,46 @@ function fecharTemporada(){
   P.temporadas.push({ano:P.liga.temporada, clube:P.carreira.clube, pos, jogos:t.jogos, gols:t.gols, assist:t.assist, nota:Number(notaMedia.toFixed(2))});
   if(t.gols>=10){ P.stats.chuteiras = (P.stats.chuteiras||0)+1; log("Chuteira de Ouro: você foi o artilheiro da temporada.", "conquista"); }
   if(posCod(P.perfil.posicao)==="GOL" && notaMedia>=7.2){ P.stats.luvas = (P.stats.luvas||0)+1; log("Luva de Ouro: sua temporada no gol foi de elite.", "conquista"); }
+  // Bola de Ouro: finalistas da temporada (você contra outros craques da liga)
+  {
+    const t2 = P.temp || {gols:0,assist:0,notas:[]};
+    const media2 = t2.notas.length ? t2.notas.reduce((a,b)=>a+b,0)/t2.notas.length : 0;
+    const candidatos = [{nome:`${P.perfil.nome} (você)`, score: t2.gols*2 + t2.assist + media2*2}];
+    const outros = [...CLUBES_LIGA].filter(n=>n!==P.carreira.clube).sort(()=>Math.random()-0.5).slice(0,4);
+    for(const n of outros) candidatos.push({nome:`Craque do ${n}`, score: r(8,22) + r(0,6)});
+    const ranking = candidatos.sort((a,b)=>b.score-a.score).slice(0,3);
+    log(`Bola de Ouro ${P.liga.temporada}: finalistas ${ranking.map(x=>x.nome).join(", ")}. Vencedor: ${ranking[0].nome}.`, "conquista");
+  }
+  // Copas da temporada: mata-mata de 4 clubes (você + 3 da liga), uma por competição
+  disputarCopa("Copa do Brasil");
+  disputarContinental();
+  // metas do clube: cada meta cumprida dá bônus; cada uma não cumprida pesa no treinador
+  const metasRes = (P.liga?.metas||[]).map(m=>({m, ...progressoMeta(m)}));
+  for(const x of metasRes){
+    if(x.ok){ P.vida.dinheiro += 500; P.mente.reputacao = clamp(P.mente.reputacao+2,0,100); P.rel.treinador = clamp(P.rel.treinador+5,0,100); log(`Meta cumprida: ${x.m.texto}.`, "conquista"); }
+    else { P.rel.treinador = clamp(P.rel.treinador-5,0,100); log(`Meta não cumprida: ${x.m.texto}.`, "evento"); }
+  }
   P.temp = {jogos:0,gols:0,assist:0,notas:[]};
   P.golsTemp = 0;
   // renovação de contrato: a proposta depende do desempenho
   const ganhoBase = pos<=3 ? 0.3 : pos<=6 ? 0.15 : 0.05;
+  const barganha = Math.round(poderBarganha()*100);
   P.eventoAtual = {
     id:"renovacao", titulo:"Renovação de contrato",
-    texto:`O clube quer renovar seu contrato. Você terminou em ${pos}º lugar e o salário atual é R$ ${P.carreira.salario}/mês.`,
+    texto:`O clube quer renovar seu contrato. Você terminou em ${pos}º lugar e o salário atual é R$ ${P.carreira.salario}/mês. Poder de barganha: ${barganha}%.`,
     opcoes:[
       {t:`Aceitar a proposta (+${Math.round(ganhoBase*100)}%)`, efeito:{}, fx:()=>{ P.carreira.salario = Math.round(P.carreira.salario*(1+ganhoBase)); }, log:"Você renovou o contrato."},
-      {t:"Pedir um aumento maior", efeito:{estresse:+4}, sorte:{p:0.5,ganho:0,perda:0}, fx:()=>{ const sobe = Math.random()<0.5; P.carreira.salario = Math.round(P.carreira.salario*(sobe?1+ganhoBase*2:1)); }, log:"Você negociou com dureza."},
+      {t:`Enviar exigências (${barganha}% de chance)`, efeito:{estresse:+4}, fx:()=>{
+        const ok = Math.random() < poderBarganha();
+        P.filaEventos = P.filaEventos || [];
+        P.filaEventos.unshift({ id:"resposta_clube", titulo:"Resposta do clube",
+          texto: ok ? "A diretoria aceitou suas exigências e subiu a proposta." : "A diretoria não cedeu. A proposta original continua na mesa.",
+          opcoes: ok
+            ? [{t:"Assinar a nova proposta", efeito:{felicidade:+2}, fx:()=>{ P.carreira.salario = Math.round(P.carreira.salario*(1+ganhoBase*2)); }, log:"Você assinou o contrato com o aumento."}]
+            : [{t:"Assinar a proposta original", efeito:{}, fx:()=>{ P.carreira.salario = Math.round(P.carreira.salario*(1+ganhoBase)); }, log:"Você assinou a proposta original."},
+               {t:"Recusar e buscar outro clube", efeito:{reputacao:+2,felicidade:-3}, fx:()=>{ P.filaEventos.push(gerarProposta()); }, log:"Você recusou e vai procurar outro clube."}]
+        });
+      }, log:"Você enviou suas exigências ao clube."},
       {t:"Recusar e buscar outro clube", efeito:{reputacao:+2,felicidade:-3}, fx:()=>{ P.filaEventos=P.filaEventos||[]; P.filaEventos.push(gerarProposta()); }, log:"Você recusou e vai procurar outro clube."},
     ]
   };
@@ -1643,13 +1746,165 @@ function telaCriador(){
     <div class="card">
       <div class="steps">${PASSOS.map((p,i)=>`<span class="${i<=C.passo?"on":""}"></span>`).join("")}</div>
       <h3>${C.passo+1}. ${PASSOS[C.passo]}</h3>
-      ${[passoIdentidade,passoAparencia,passoOrigem,passoHistoria][C.passo]()}
+      ${[passoIdentidade,passoAparencia,passoOrigem,passoDraft,passoHistoria][C.passo]()}
       <div class="btns" style="margin-top:16px">
         ${C.passo>0?`<button class="b" onclick="voltarPasso()">Voltar</button>`:""}
         <button class="b primary" onclick="proximoPasso()">${C.passo===PASSOS.length-1?"Criar personagem":"Próximo"}</button>
         ${C.passo===0?`<button class="b" onclick="C=null;render()">Cancelar</button>`:""}
       </div>
     </div>`;
+}
+
+/* ---------- Minigame de pênalti (mira + medidor "pare no verde") ---------- */
+const PEN_ALVOS = [
+  {id:"TL", nome:"Alto esquerdo", col:"esq"}, {id:"TR", nome:"Alto direito", col:"dir"}, {id:"C", nome:"Centro", col:"meio"},
+  {id:"BL", nome:"Baixo esquerdo", col:"esq"}, {id:"BR", nome:"Baixo direito", col:"dir"},
+];
+const penal = {alvo:null, pos:0, dir:1, timer:null};
+function penEscolher(id){ penal.alvo = id; render(); }
+function penIniciar(){
+  if(penal.timer || !penal.alvo) return;
+  penal.pos = 0; penal.dir = 1;
+  penal.timer = setInterval(()=>{
+    penal.pos += penal.dir * 0.02; if(penal.pos>=1 || penal.pos<=0) penal.dir *= -1;
+    const n = document.getElementById("pen-needle"); if(n) n.style.left = `calc(${(penal.pos*100).toFixed(1)}% - 2px)`;
+  }, 16);
+  render();
+}
+function penBater(){
+  if(!penal.timer) return;
+  clearInterval(penal.timer); penal.timer = null;
+  const alvo = PEN_ALVOS.find(a=>a.id===penal.alvo);
+  const verde = Math.abs(penal.pos-0.5) < 0.08;
+  const goleiro = pick(["esq","meio","dir"]);
+  const chance = goleiro!==alvo.col ? (verde ? 0.85 : 0.6) : (verde ? 0.2 : 0.05);
+  const gol = Math.random() < chance;
+  if(gol){ P.mente.reputacao = clamp(P.mente.reputacao+1,0,100); P.mente.felicidade = clamp(P.mente.felicidade+3,0,100); P.vida.dinheiro += 200; }
+  else { P.mente.estresse = clamp(P.mente.estresse+3,0,100); P.mente.felicidade = clamp(P.mente.felicidade-2,0,100); }
+  const txt = gol ? `Pênalti ${alvo.nome.toLowerCase()}: GOL! O goleiro ${goleiro==="meio"?"ficou no meio":goleiro==="esq"?"foi para a esquerda":"foi para a direita"}.`
+                  : `Pênalti ${alvo.nome.toLowerCase()}: defendeu. O goleiro estudou seus pênaltis.`;
+  log(txt, gol?"conquista":"evento");
+  P.penDia = P.semana; penal.alvo = null;
+  salvar(); render();
+}
+/* ---------- Copas: mata-mata de 4 clubes, semifinais e final em jogo único ---------- */
+function disputarCopa(nome){
+  const outros = [...CLUBES_LIGA].filter(n=>n!==P.carreira.clube).sort(()=>Math.random()-0.5).slice(0,3);
+  const times = [P.carreira.clube, ...outros];
+  const forca = n => forcaTime(n) ?? 50;
+  const decidir = (a,b) => {
+    const [ga,gb] = simularPlacar(forca(a), forca(b));
+    if(ga!==gb) return ga>gb ? a : b;
+    return Math.random()<0.5 ? a : b; // pênaltis
+  };
+  const sf1 = decidir(times[0], times[1]);
+  const sf2 = decidir(times[2], times[3]);
+  const campeao = decidir(sf1, sf2);
+  P.copas = P.copas || [];
+  P.copas.push({temporada: P.liga.temporada, nome, campeao});
+  if(campeao===P.carreira.clube){
+    P.carreira.titulos++; P.vida.dinheiro += 1000; P.mente.reputacao = clamp(P.mente.reputacao+3,0,100);
+    log(`Você foi campeão da ${nome}!`, "conquista");
+  } else {
+    log(`${nome}: você caiu no mata-mata. Campeão: ${campeao}.`, "evento");
+  }
+}
+
+/* ---------- Copa Continental: fase de grupos (2 grupos de 4, todos contra todos) e mata-mata ---------- */
+function disputarContinental(){
+  const outros = [...CLUBES_LIGA].filter(n=>n!==P.carreira.clube).sort(()=>Math.random()-0.5).slice(0,7);
+  const clubes = [P.carreira.clube, ...outros];
+  const forca = n => forcaTime(n) ?? 50;
+  const grupos = [clubes.slice(0,4), clubes.slice(4,8)];
+  const tabelas = grupos.map(g => g.map(n=>({nome:n, pts:0, gp:0, gc:0})));
+  const jogos = []; // jogos com o clube do jogador, para o registro
+  grupos.forEach((g,gi)=>{
+    for(let i=0;i<g.length;i++) for(let j=i+1;j<g.length;j++){
+      const [ga,gb] = simularPlacar(forca(g[i]), forca(g[j]));
+      const ti = tabelas[gi][i], tj = tabelas[gi][j];
+      ti.gp+=ga; ti.gc+=gb; tj.gp+=gb; tj.gc+=ga;
+      if(ga>gb) ti.pts+=3; else if(gb>ga) tj.pts+=3; else { ti.pts++; tj.pts++; }
+      if(g[i]===P.carreira.clube) jogos.push(`${g[i]} ${ga}x${gb} ${g[j]}`);
+      if(g[j]===P.carreira.clube) jogos.push(`${g[j]} ${gb}x${ga} ${g[i]}`);
+    }
+  });
+  const ordena = t => [...t].sort((a,b)=> b.pts-a.pts || (b.gp-b.gc)-(a.gp-a.gc));
+  const [a1,a2] = ordena(tabelas[0]).map(x=>x.nome);
+  const [b1,b2] = ordena(tabelas[1]).map(x=>x.nome);
+  const decidir = (x,y) => {
+    const [gx,gy] = simularPlacar(forca(x), forca(y));
+    if(gx!==gy) return gx>gy ? x : y;
+    return Math.random()<0.5 ? x : y;
+  };
+  const f1 = decidir(a1, b2), f2 = decidir(b1, a2);
+  const campeao = decidir(f1, f2);
+  const passou = [a1,a2,b1,b2].includes(P.carreira.clube);
+  P.copas = P.copas || [];
+  P.copas.push({temporada: P.liga.temporada, nome:"Copa Continental", campeao});
+  if(campeao===P.carreira.clube){
+    P.carreira.titulos++; P.vida.dinheiro += 1500; P.mente.reputacao = clamp(P.mente.reputacao+4,0,100);
+    log(`Você foi campeão da Copa Continental! Grupos: ${jogos.join("; ")}.`, "conquista");
+  } else if(passou){
+    log(`Copa Continental: você passou da fase de grupos e caiu no mata-mata. Campeão: ${campeao}.`, "evento");
+  } else {
+    log(`Copa Continental: você ficou fora da fase de grupos. Campeão: ${campeao}.`, "evento");
+  }
+}
+
+/* ---------- Cartão para compartilhar (imagem PNG) ---------- */
+function baixarCartao(){
+  const cv = document.createElement("canvas");
+  cv.width = 1080; cv.height = 1080;
+  const g = cv.getContext("2d");
+  if(!g){ alert("Seu navegador não permitiu gerar a imagem."); return; }
+  const grad = g.createLinearGradient(0,0,0,1080);
+  grad.addColorStop(0,"#1a1505"); grad.addColorStop(1,"#050505");
+  g.fillStyle = grad; g.fillRect(0,0,1080,1080);
+  g.fillStyle = "#F2B705"; g.fillRect(0,0,1080,10);
+  g.textAlign = "center";
+  g.font = "bold 46px sans-serif"; g.fillStyle = "#F2B705";
+  g.fillText("THE FENÔMENO · CARREIRA", 540, 110);
+  g.font = "bold 120px sans-serif"; g.fillStyle = "#ffffff";
+  g.fillText(String(ovr()), 540, 360);
+  g.font = "bold 64px sans-serif"; g.fillText(P.perfil.nome, 540, 470);
+  g.font = "40px sans-serif"; g.fillStyle = "#a1a1aa";
+  g.fillText(`${P.carreira.clube} · ${P.idade} anos`, 540, 530);
+  const stats = [["GOLS",P.stats.gols],["ASSIST.",P.stats.assist],["TEMPORADAS",(P.temporadas||[]).length],["TÍTULOS",P.carreira.titulos]];
+  stats.forEach(([n,v],i)=>{
+    const x = 180 + i*240;
+    g.font = "bold 84px sans-serif"; g.fillStyle = "#F2B705"; g.fillText(String(v), x, 680);
+    g.font = "28px sans-serif"; g.fillStyle = "#a1a1aa"; g.fillText(n, x, 730);
+  });
+  g.font = "28px sans-serif"; g.fillStyle = "#71717a";
+  g.fillText("Feito no simulador de carreira", 540, 1010);
+  cv.toBlob(blob=>{
+    if(!blob){ alert("Não foi possível gerar a imagem."); return; }
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `cartao-${(P.perfil.nome||"carreira").replace(/\s+/g,"-").toLowerCase()}.png`;
+    document.body.appendChild(a); a.click(); a.remove();
+  }, "image/png");
+}
+
+async function copiarResumo(){
+  const t = (P.temporadas||[]);
+  const texto = `${P.perfil.nome} · ${P.carreira.clube} · ${P.idade} anos · OVR ${ovr()} · ${P.stats.gols} gols · ${P.stats.assist} assistências · ${t.length} temporadas · ${P.carreira.titulos} títulos`;
+  try{ await navigator.clipboard.writeText(texto); alert("Resumo copiado:\n" + texto); }
+  catch{ alert(texto); }
+}
+function cardPenalti(){
+  if(P.penDia===P.semana) return `<div class="card"><h3>Pênalti</h3><p class="mut">Você já cobrou um pênalti nesta semana.</p></div>`;
+  const escolha = PEN_ALVOS.map(a=>`<button class="b ${penal.alvo===a.id?"on":""}" onclick="penEscolher('${a.id}')">${a.id}</button>`).join("");
+  const acao = !penal.alvo ? `<p class="mut">Escolha onde mirar.</p>`
+    : !penal.timer ? `<div class="btns"><button class="b primary" onclick="penIniciar()">Preparar cobrança ▶</button></div>`
+    : `<div class="pen-meter"><div class="pen-needle" id="pen-needle"></div></div>
+       <div class="btns"><button class="b primary" onclick="penBater()">BATER</button></div>`;
+  return `<div class="card">
+    <h3>Pênalti · cobrança</h3>
+    <p class="mut">Escolha o canto e pare o medidor no verde.</p>
+    <div class="pen-alvos">${escolha}</div>
+    ${acao}
+  </div>`;
 }
 
 function telaInicio(){
@@ -1700,6 +1955,12 @@ function telaInicio(){
   const noticias = (P.noticias||[]).slice(0,3).map(n=>`<p>${n.t}</p>`).join("");
   const cardNoticias = noticias ? `<div class="card"><h3>Notícias</h3><div class="log">${noticias}</div></div>` : "";
 
+  const cardMetas = (P.liga?.metas||[]).length ? `
+    <div class="card">
+      <h3>Metas do clube</h3>
+      ${P.liga.metas.map(m=>{ const pg=progressoMeta(m); return `<p>${pg.ok?"✔":"○"} ${m.texto} <span class="mut">(${m.id==="gols"?`${pg.atual}/${m.alvo} gols`:`${pg.atual}º agora`})</span></p>`; }).join("")}
+    </div>` : "";
+
   const podeAtividade = P.diaAtividade !== P.diaAbs;
   const treinou = jaTreinouNestaSemana();
   const bloqueio = P.eventoAtual ? "Resolva o evento para continuar."
@@ -1730,6 +1991,9 @@ function telaInicio(){
     ${ev}
     ${ultimo}
     ${cardNoticias}
+    ${cardMetas}
+    <div class="card"><h3>Compartilhar</h3><div class="btns"><button class="b" onclick="copiarResumo()">Copiar resumo da carreira</button><button class="b" onclick="baixarCartao()">Baixar cartão (PNG)</button></div></div>
+    ${!P.eventoAtual && !jogoPendenteHoje() && !P.partida ? cardPenalti() : ""}
     <div class="card">
       <h3>Ações de hoje</h3>
       <div class="btns">
