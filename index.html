@@ -520,7 +520,38 @@ function avatarHTML(p){
 }
 
 let C = null; // estado do criador
-const PASSOS = ["Identidade","Aparência","Origem","História"];
+const PASSOS = ["Identidade","Aparência","Origem","Draft","História"];
+const DRAFT_ATRIBUTOS = [
+  {k:"velocidade",nome:"Velocidade"}, {k:"finalizacao",nome:"Finalização"}, {k:"passe",nome:"Passe"},
+  {k:"drible",nome:"Drible"}, {k:"defesa",nome:"Defesa"}, {k:"resistencia",nome:"Físico"}, {k:"visao",nome:"Visão"},
+];
+const DRAFT_LEGENDS_QTD = 8;
+function iniciarDraft(){
+  const nomes = [...LENDAS].sort(()=>Math.random()-0.5).slice(0, DRAFT_LEGENDS_QTD).map(l=>l.nome);
+  C.draft = { lendas: nomes.map(n=>({nome:n, valores: Object.fromEntries(DRAFT_ATRIBUTOS.map(a=>[a.k, r(55,95)]))})), escolhas: [] };
+}
+function escolherDraft(k){
+  const lenda = C.draft.lendas[C.draft.escolhas.length];
+  if(!lenda) return;
+  C.draft.escolhas.push({lenda:lenda.nome, attr:k, valor:lenda.valores[k]});
+  render();
+}
+function desfazerDraft(){ if(C.draft?.escolhas.length){ C.draft.escolhas.pop(); render(); } }
+function passoDraft(){
+  if(!C.draft) iniciarDraft();
+  const d = C.draft; const n = d.escolhas.length;
+  if(n >= DRAFT_LEGENDS_QTD){
+    const resumo = d.escolhas.map(e=>`<li>${e.lenda}: <b>${DRAFT_ATRIBUTOS.find(a=>a.k===e.attr).nome}</b> ${e.valor}</li>`).join("");
+    return `<p class="mut">Você roubou um atributo de cada lenda. Esses atributos sobem no seu personagem.</p><ul>${resumo}</ul>
+      <div class="btns"><button class="b" onclick="desfazerDraft()">Desfazer última escolha</button></div>`;
+  }
+  const lenda = d.lendas[n];
+  return `
+    <p class="mut">Lenda ${n+1} de ${DRAFT_LEGENDS_QTD}: escolha um atributo para roubar. O valor da lenda indica o quanto ele sobe no seu personagem.</p>
+    <h3 style="margin-top:8px">${lenda.nome}</h3>
+    <div class="opts">${DRAFT_ATRIBUTOS.map(a=>`<div class="opt" onclick="escolherDraft('${a.k}')">${a.nome} <b>${lenda.valores[a.k]}</b></div>`).join("")}</div>
+    ${n>0?`<div class="btns" style="margin-top:12px"><button class="b" onclick="desfazerDraft()">Voltar</button></div>`:""}`;
+}
 
 function iniciarCriador(){
   C = {
@@ -627,6 +658,7 @@ function validarPasso(){
     if(!C.nome || !C.sobrenome){ alert("Preencha nome e sobrenome."); return false; }
     if(!C.cidade){ alert("Informe a cidade onde nasceu."); return false; }
   }
+  if(C.passo===3 && (C.draft?.escolhas.length||0) < DRAFT_LEGENDS_QTD){ alert("Complete o draft escolhendo um atributo de cada lenda."); return false; }
   return true;
 }
 
@@ -668,6 +700,8 @@ function criarPersonagem(){
   const origem = DADOS.origens[C.origem];
   const clubeEscolhido = DADOS.clubes.find(c=>c.id===C.clubeBase) || DADOS.clubes[0];
   const at = {}; ["finalizacao","passe","drible","defesa","velocidade","resistencia","visao"].forEach(k=>at[k]=r(28,48));
+  // draft: cada atributo roubado de uma lenda soma parte do valor dela ao personagem
+  for(const e of (C.draft?.escolhas||[])) at[e.attr] = clamp(at[e.attr] + Math.round((e.valor-50)*0.25), 20, 80);
   P = {
     perfil: {
       nome: `${C.nome} ${C.sobrenome}`,
@@ -1599,6 +1633,16 @@ function fecharTemporada(){
   P.temporadas.push({ano:P.liga.temporada, clube:P.carreira.clube, pos, jogos:t.jogos, gols:t.gols, assist:t.assist, nota:Number(notaMedia.toFixed(2))});
   if(t.gols>=10){ P.stats.chuteiras = (P.stats.chuteiras||0)+1; log("Chuteira de Ouro: você foi o artilheiro da temporada.", "conquista"); }
   if(posCod(P.perfil.posicao)==="GOL" && notaMedia>=7.2){ P.stats.luvas = (P.stats.luvas||0)+1; log("Luva de Ouro: sua temporada no gol foi de elite.", "conquista"); }
+  // Bola de Ouro: finalistas da temporada (você contra outros craques da liga)
+  {
+    const t2 = P.temp || {gols:0,assist:0,notas:[]};
+    const media2 = t2.notas.length ? t2.notas.reduce((a,b)=>a+b,0)/t2.notas.length : 0;
+    const candidatos = [{nome:`${P.perfil.nome} (você)`, score: t2.gols*2 + t2.assist + media2*2}];
+    const outros = [...CLUBES_LIGA].filter(n=>n!==P.carreira.clube).sort(()=>Math.random()-0.5).slice(0,4);
+    for(const n of outros) candidatos.push({nome:`Craque do ${n}`, score: r(8,22) + r(0,6)});
+    const ranking = candidatos.sort((a,b)=>b.score-a.score).slice(0,3);
+    log(`Bola de Ouro ${P.liga.temporada}: finalistas ${ranking.map(x=>x.nome).join(", ")}. Vencedor: ${ranking[0].nome}.`, "conquista");
+  }
   // metas do clube: cada meta cumprida dá bônus; cada uma não cumprida pesa no treinador
   const metasRes = (P.liga?.metas||[]).map(m=>({m, ...progressoMeta(m)}));
   for(const x of metasRes){
@@ -1615,7 +1659,17 @@ function fecharTemporada(){
     texto:`O clube quer renovar seu contrato. Você terminou em ${pos}º lugar e o salário atual é R$ ${P.carreira.salario}/mês. Poder de barganha: ${barganha}%.`,
     opcoes:[
       {t:`Aceitar a proposta (+${Math.round(ganhoBase*100)}%)`, efeito:{}, fx:()=>{ P.carreira.salario = Math.round(P.carreira.salario*(1+ganhoBase)); }, log:"Você renovou o contrato."},
-      {t:`Pedir um aumento maior (${barganha}% de chance)`, efeito:{estresse:+4}, fx:()=>{ const sobe = Math.random()<poderBarganha(); P.carreira.salario = Math.round(P.carreira.salario*(sobe?1+ganhoBase*2:1)); log(sobe?"O clube aceitou subir seu salário.":"O clube manteve a proposta original.", "evento"); }, log:"Você negociou com dureza."},
+      {t:`Enviar exigências (${barganha}% de chance)`, efeito:{estresse:+4}, fx:()=>{
+        const ok = Math.random() < poderBarganha();
+        P.filaEventos = P.filaEventos || [];
+        P.filaEventos.unshift({ id:"resposta_clube", titulo:"Resposta do clube",
+          texto: ok ? "A diretoria aceitou suas exigências e subiu a proposta." : "A diretoria não cedeu. A proposta original continua na mesa.",
+          opcoes: ok
+            ? [{t:"Assinar a nova proposta", efeito:{felicidade:+2}, fx:()=>{ P.carreira.salario = Math.round(P.carreira.salario*(1+ganhoBase*2)); }, log:"Você assinou o contrato com o aumento."}]
+            : [{t:"Assinar a proposta original", efeito:{}, fx:()=>{ P.carreira.salario = Math.round(P.carreira.salario*(1+ganhoBase)); }, log:"Você assinou a proposta original."},
+               {t:"Recusar e buscar outro clube", efeito:{reputacao:+2,felicidade:-3}, fx:()=>{ P.filaEventos.push(gerarProposta()); }, log:"Você recusou e vai procurar outro clube."}]
+        });
+      }, log:"Você enviou suas exigências ao clube."},
       {t:"Recusar e buscar outro clube", efeito:{reputacao:+2,felicidade:-3}, fx:()=>{ P.filaEventos=P.filaEventos||[]; P.filaEventos.push(gerarProposta()); }, log:"Você recusou e vai procurar outro clube."},
     ]
   };
@@ -1689,7 +1743,7 @@ function telaCriador(){
     <div class="card">
       <div class="steps">${PASSOS.map((p,i)=>`<span class="${i<=C.passo?"on":""}"></span>`).join("")}</div>
       <h3>${C.passo+1}. ${PASSOS[C.passo]}</h3>
-      ${[passoIdentidade,passoAparencia,passoOrigem,passoHistoria][C.passo]()}
+      ${[passoIdentidade,passoAparencia,passoOrigem,passoDraft,passoHistoria][C.passo]()}
       <div class="btns" style="margin-top:16px">
         ${C.passo>0?`<button class="b" onclick="voltarPasso()">Voltar</button>`:""}
         <button class="b primary" onclick="proximoPasso()">${C.passo===PASSOS.length-1?"Criar personagem":"Próximo"}</button>
@@ -1729,6 +1783,12 @@ function penBater(){
   log(txt, gol?"conquista":"evento");
   P.penDia = P.semana; penal.alvo = null;
   salvar(); render();
+}
+async function copiarResumo(){
+  const t = (P.temporadas||[]);
+  const texto = `${P.perfil.nome} · ${P.carreira.clube} · ${P.idade} anos · OVR ${ovr()} · ${P.stats.gols} gols · ${P.stats.assist} assistências · ${t.length} temporadas · ${P.carreira.titulos} títulos`;
+  try{ await navigator.clipboard.writeText(texto); alert("Resumo copiado:\n" + texto); }
+  catch{ alert(texto); }
 }
 function cardPenalti(){
   if(P.penDia===P.semana) return `<div class="card"><h3>Pênalti</h3><p class="mut">Você já cobrou um pênalti nesta semana.</p></div>`;
@@ -1830,6 +1890,7 @@ function telaInicio(){
     ${ultimo}
     ${cardNoticias}
     ${cardMetas}
+    <div class="card"><h3>Compartilhar</h3><div class="btns"><button class="b" onclick="copiarResumo()">Copiar resumo da carreira</button></div></div>
     ${!P.eventoAtual && !jogoPendenteHoje() && !P.partida ? cardPenalti() : ""}
     <div class="card">
       <h3>Ações de hoje</h3>
