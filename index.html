@@ -1645,7 +1645,7 @@ function fecharTemporada(){
   }
   // Copas da temporada: mata-mata de 4 clubes (você + 3 da liga), uma por competição
   disputarCopa("Copa do Brasil");
-  disputarCopa("Copa Continental");
+  disputarContinental();
   // metas do clube: cada meta cumprida dá bônus; cada uma não cumprida pesa no treinador
   const metasRes = (P.liga?.metas||[]).map(m=>({m, ...progressoMeta(m)}));
   for(const x of metasRes){
@@ -1807,6 +1807,47 @@ function disputarCopa(nome){
     log(`Você foi campeão da ${nome}!`, "conquista");
   } else {
     log(`${nome}: você caiu no mata-mata. Campeão: ${campeao}.`, "evento");
+  }
+}
+
+/* ---------- Copa Continental: fase de grupos (2 grupos de 4, todos contra todos) e mata-mata ---------- */
+function disputarContinental(){
+  const outros = [...CLUBES_LIGA].filter(n=>n!==P.carreira.clube).sort(()=>Math.random()-0.5).slice(0,7);
+  const clubes = [P.carreira.clube, ...outros];
+  const forca = n => forcaTime(n) ?? 50;
+  const grupos = [clubes.slice(0,4), clubes.slice(4,8)];
+  const tabelas = grupos.map(g => g.map(n=>({nome:n, pts:0, gp:0, gc:0})));
+  const jogos = []; // jogos com o clube do jogador, para o registro
+  grupos.forEach((g,gi)=>{
+    for(let i=0;i<g.length;i++) for(let j=i+1;j<g.length;j++){
+      const [ga,gb] = simularPlacar(forca(g[i]), forca(g[j]));
+      const ti = tabelas[gi][i], tj = tabelas[gi][j];
+      ti.gp+=ga; ti.gc+=gb; tj.gp+=gb; tj.gc+=ga;
+      if(ga>gb) ti.pts+=3; else if(gb>ga) tj.pts+=3; else { ti.pts++; tj.pts++; }
+      if(g[i]===P.carreira.clube) jogos.push(`${g[i]} ${ga}x${gb} ${g[j]}`);
+      if(g[j]===P.carreira.clube) jogos.push(`${g[j]} ${gb}x${ga} ${g[i]}`);
+    }
+  });
+  const ordena = t => [...t].sort((a,b)=> b.pts-a.pts || (b.gp-b.gc)-(a.gp-a.gc));
+  const [a1,a2] = ordena(tabelas[0]).map(x=>x.nome);
+  const [b1,b2] = ordena(tabelas[1]).map(x=>x.nome);
+  const decidir = (x,y) => {
+    const [gx,gy] = simularPlacar(forca(x), forca(y));
+    if(gx!==gy) return gx>gy ? x : y;
+    return Math.random()<0.5 ? x : y;
+  };
+  const f1 = decidir(a1, b2), f2 = decidir(b1, a2);
+  const campeao = decidir(f1, f2);
+  const passou = [a1,a2,b1,b2].includes(P.carreira.clube);
+  P.copas = P.copas || [];
+  P.copas.push({temporada: P.liga.temporada, nome:"Copa Continental", campeao});
+  if(campeao===P.carreira.clube){
+    P.carreira.titulos++; P.vida.dinheiro += 1500; P.mente.reputacao = clamp(P.mente.reputacao+4,0,100);
+    log(`Você foi campeão da Copa Continental! Grupos: ${jogos.join("; ")}.`, "conquista");
+  } else if(passou){
+    log(`Copa Continental: você passou da fase de grupos e caiu no mata-mata. Campeão: ${campeao}.`, "evento");
+  } else {
+    log(`Copa Continental: você ficou fora da fase de grupos. Campeão: ${campeao}.`, "evento");
   }
 }
 
