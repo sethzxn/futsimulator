@@ -585,7 +585,7 @@ function passoOrigem(){
   return `
     <label>Origem da família</label>${origens}
     <label>Posição</label>
-    <select id="c_posicao">${["Goleiro","Zagueiro","Lateral","Volante","Meia","Ponta","Atacante"].map(p=>`<option ${C.posicao===p?"selected":""}>${p}</option>`).join("")}</select>
+    <select id="c_posicao">${["Goleiro","Zagueiro","Lateral","Volante","Meia central","Meia ofensivo","Ponta","Segundo atacante","Atacante"].map(p=>`<option ${C.posicao===p?"selected":""}>${p}</option>`).join("")}</select>
     <label>O que te motiva a jogar?</label>
     <input id="c_motivacao" value="${C.motivacao}" placeholder="Ex.: sair da pobreza, provar para o pai">`;
 }
@@ -738,6 +738,10 @@ const PARTIDA_PARTES = {
 
 // Eventos extras no meio do jogo, ligados à tática e aos atributos.
 const EVENTOS_PARTIDA_TIPO = [
+  { id:"msg_par_boa", peso:(pt,P)=> P.par && P.par.status==="namoro" && P.par.afinidade>=60 ? 2.5 : 0, texto:"Uma mensagem de quem você ama chega antes do lance, e você entra no jogo com outra cabeça.", efeito:{atq:+0.03} },
+  { id:"msg_par_ruim", peso:(pt,P)=> P.par && P.par.status==="namoro" && P.par.afinidade<35 ? 2.5 : 0, texto:"Uma discussão no celular ainda pesa, e você demora para reagir na jogada.", efeito:{atq:-0.04, def:-0.02} },
+  { id:"conta_chegando", peso:(pt,P)=> P.vida.dinheiro<0 ? 1.5 : 0, texto:"A cabeça está nas contas atrasadas, e a concentração cai por um instante.", efeito:{atq:-0.03} },
+  { id:"leitura_de_jogo", peso:(pt,P)=> nivelHobby("leitura")>=2 ? 1.5 : 0, texto:"Você lembra de um livro sobre tática e lê o espaço antes da jogada.", efeito:{atq:+0.03} },
   { id:"contra_perigoso", peso:(pt,P)=> pt.tatica==="ofensiva" ? 3 : 1, texto:"O time avança de forma descuidada e o adversário sai no contra-ataque.", efeito:{def:-0.04, sofreChance:0.20} },
   { id:"bloqueio_decisivo", peso:(pt,P)=> pt.tatica==="defensiva" ? 3 : 1, texto:"Você se joga na frente de um chute e bloqueia a finalização.", efeito:{def:+0.03, atq:0}, exigeAt:{defesa:55} },
   { id:"corrida_longa", peso:(pt,P)=> P.at.velocidade>=60 ? 3 : 0.4, texto:"Você dispara em corrida longa e chega à frente do marcador.", efeito:{atq:+0.05}, exigeAt:{velocidade:60} },
@@ -1290,6 +1294,10 @@ function resolverLance(i){
 
   let p = op.base + (at-50)*0.006 + forma + estresse + comEquipe;
   if(ataque) p += tat.atq + ins.atq + pt.bonusAtq + cli.atq + 0.10 + (P.nivel==='pro' ? -0.05 : 0.03);
+  const pc = posCod(P.perfil.posicao);
+  if(ataque && pc==='ATA') p += 0.02;
+  if(lance.tipo==='defesa' && (pc==='ZAG'||pc==='GOL')) p += 0.03;
+  p += bonusPessoal(op.acao);
   if(lance.tipo==="defesa") p += tat.def + pt.bonusDef;
   if(op.acao==="passe") p += ins.pas + cli.pas;
   if(op.acao==="chute" || op.acao==="cabeca") p += cli.fin;
@@ -1401,6 +1409,8 @@ function finalizarPartida(){
   const nota = clamp(6 + pt.gJ*1.2 + pt.asJ*0.8 - pt.gA*0.3 + (P.corpo.forma-50)/60 + (Math.random()-0.5) - pt.cartoesJog*0.4, 3, 10);
   P.golsTemp = (P.golsTemp||0) + pt.gJ;
   P.stats.jogos++; P.stats.gols += pt.gJ; P.stats.assist += pt.asJ; P.stats.notas.push(Number(nota.toFixed(1)));
+  P.temp = P.temp || {jogos:0,gols:0,assist:0,notas:[]};
+  P.temp.jogos++; P.temp.gols += pt.gJ; P.temp.assist += pt.asJ; P.temp.notas.push(Number(nota.toFixed(1)));
   P.stats.cartoes = (P.stats.cartoes||0) + pt.cartoesJog;
   if(res==="V"){ P.vida.dinheiro += 400; P.mente.reputacao = clamp(P.mente.reputacao+1,0,100); P.mente.felicidade = clamp(P.mente.felicidade+6,0,100); }
   else if(res==="E"){ P.vida.dinheiro += 150; }
@@ -1528,6 +1538,7 @@ function fecharSemana(){
   if(P.corpo.saude < 60) P.mente.felicidade = clamp(P.mente.felicidade-1,0,100);
   declinioIdade();
 
+  P.ovrPico = Math.max(P.ovrPico||0, ovr());
   cobrarDividas();
   rendimentoSemanal();
   semanaPessoal();
@@ -1543,6 +1554,13 @@ function fecharTemporada(){
   if(pos===1){ P.carreira.titulos++; P.vida.dinheiro += 2000; P.mente.reputacao = clamp(P.mente.reputacao+5,0,100); log(`Campeão da temporada ${P.liga.temporada}!`, "conquista"); }
   else log(`Terminou a temporada ${P.liga.temporada} em ${pos}º lugar.`, "evento");
   if(pos===1 && (P.golsTemp||0)>=8){ P.stats.bolas = (P.stats.bolas||0)+1; log("Você ganhou a Bola de Ouro da temporada!", "conquista"); }
+  const t = P.temp || {jogos:0,gols:0,assist:0,notas:[]};
+  const notaMedia = t.notas.length ? t.notas.reduce((a,b)=>a+b,0)/t.notas.length : 0;
+  P.temporadas = P.temporadas || [];
+  P.temporadas.push({ano:P.liga.temporada, clube:P.carreira.clube, pos, jogos:t.jogos, gols:t.gols, assist:t.assist, nota:Number(notaMedia.toFixed(2))});
+  if(t.gols>=10){ P.stats.chuteiras = (P.stats.chuteiras||0)+1; log("Chuteira de Ouro: você foi o artilheiro da temporada.", "conquista"); }
+  if(posCod(P.perfil.posicao)==="GOL" && notaMedia>=7.2){ P.stats.luvas = (P.stats.luvas||0)+1; log("Luva de Ouro: sua temporada no gol foi de elite.", "conquista"); }
+  P.temp = {jogos:0,gols:0,assist:0,notas:[]};
   P.golsTemp = 0;
   // renovação de contrato: a proposta depende do desempenho
   const ganhoBase = pos<=3 ? 0.3 : pos<=6 ? 0.15 : 0.05;
@@ -1737,6 +1755,7 @@ function telaPartida(){
         <div class="kicker">Rodada ${pt.rodada} · ${pt.mandante?"Em casa":"Fora"} · ${pt.clima.nome} · ${pt.arbitragem.nome}</div>
         <h2>${P.carreira.clube} x ${pt.adv}</h2>
         <p class="mut">Placar: <b>${pt.gP} x ${pt.gA}</b> · ${pt.titular?"Titular":"Reserva (entra com menos tempo)"}</p>
+        <p class="mut" style="font-size:12px">Fora de campo: ${resumoFora()}</p>
       </div>
     </section>`;
 
@@ -2009,6 +2028,8 @@ function telaCarreira(){
     <div class="grid">
       ${statBox("Jogos", P.stats.jogos)}${statBox("Gols", P.stats.gols)}${statBox("Assistências", P.stats.assist)}${statBox("Nota média", media)}
     </div>
+    <div class="grid" style="margin-top:14px">${statBox("Bolas de Ouro", P.stats.bolas||0)}${statBox("Chuteiras", P.stats.chuteiras||0)}${statBox("Luvas", P.stats.luvas||0)}${statBox("Títulos", P.carreira.titulos)}</div>
+    <div class="card" style="margin-top:14px"><h3>Temporadas</h3>${tabelaTemporadas()}</div>
     <div class="card" style="margin-top:14px"><h3>Clube</h3>
       <p class="mut">${P.carreira.clube} · salário base R$ ${P.carreira.salario}/mês</p>
       <div class="btns" style="margin-top:10px"><button class="b" onclick="aposentarAgora()">Aposentar agora</button></div>
@@ -2037,7 +2058,15 @@ function telaPerfil(){
     </div>
     <div class="card"><h3>História</h3>
       <div class="story">${p.historia || "<span class='mut'>Você ainda não escreveu a história.</span>"}</div>
+    </div>
+    <div class="card"><h3>Nova carreira</h3>
+      <p class="mut">Começa do zero com outro personagem. A carreira atual fica salva até você concluir a criação da nova.</p>
+      <div class="btns" style="margin-top:10px"><button class="b primary" onclick="novaCarreira()">Iniciar nova carreira</button></div>
     </div>`;
+}
+function novaCarreira(){
+  if(!confirm("Começar uma nova carreira? A atual só será substituída quando você criar o novo personagem.")) return;
+  P = null; iniciarCriador();
 }
 
 /* ---------- Fim ---------- */
@@ -2057,6 +2086,7 @@ function aposentar(){
       <p class="mut">${p.nome} nasceu em ${p.cidade}, ${p.pais}, e defendeu o ${P.carreira.clube}. Veículos: ${P.vida.veiculos.length}. Moradia: ${P.vida.casa?"própria":"alugada"}. Reputação: ${P.mente.reputacao}.</p>
       ${p.historia?`<div class="story" style="margin-top:12px">${p.historia}</div>`:""}
     </div>
+    ${cartaoFinal()}
     <div class="btns"><button class="b primary" onclick="iniciarCriador()">Nova carreira</button></div>`;
   localStorage.removeItem(SAVE);
   P = null;
@@ -2345,6 +2375,53 @@ function telaPessoal(){
     </div>`;
 }
 
+
+/* ===== Escada final, relatórios de temporada e prêmios ===== */
+const ESCADA = ["Amador","Promessa","Jogador de clube","Titular","Destaque nacional","Craque","Seleção","Estrela continental","Top 10 mundial","Lenda","O Fenômeno"];
+function escadaFinal(){
+  const score = (P.carreira.titulos||0)*2 + (P.stats.bolas||0)*6 + (P.stats.chuteiras||0)*3 + (P.stats.luvas||0)*3 + Math.max(P.ovrPico||0, ovr())/5 + P.stats.gols/50;
+  const idx = clamp(Math.floor(score/6), 0, ESCADA.length-1);
+  return {score:Math.round(score), idx};
+}
+function tabelaTemporadas(){
+  const lista = P.temporadas || [];
+  if(!lista.length) return `<p class="mut">Nenhuma temporada completa ainda.</p>`;
+  return `<div style="overflow-x:auto"><table class="tbl">
+    <tr><th>Temp.</th><th>Clube</th><th>Jogos</th><th>Gols</th><th>Ast.</th><th>Nota</th></tr>
+    ${lista.map(t=>`<tr><td>${t.ano}</td><td>${t.clube}</td><td>${t.jogos}</td><td>${t.gols}</td><td>${t.assist}</td><td><b>${t.nota.toFixed(2)}</b></td></tr>`).join("")}
+  </table></div>`;
+}
+function cartaoFinal(){
+  const f = escadaFinal();
+  return `
+    <div class="card" style="margin-top:14px"><h3>Escada final</h3>
+      ${ESCADA.map((nome,i)=>`<div class="row" style="${i===f.idx?"color:var(--gold);font-weight:800":(i>f.idx?"opacity:.4":"")}"><span>${i+1}. ${nome}</span><span>${i===f.idx?"← sua carreira":""}</span></div>`).join("")}
+      <p class="mut" style="margin-top:10px">Pontuação ${f.score}: títulos, Bolas de Ouro, Chuteiras, Luvas, pico de OVR e gols.</p>
+    </div>
+    <div class="card"><h3>Temporadas</h3>${tabelaTemporadas()}</div>`;
+}
+
+
+/* ===== Vida fora de campo influencia o jogo ===== */
+function bonusPessoal(acao){
+  let b = 0;
+  if(P.par && P.par.status==="namoro"){ if(P.par.afinidade>=60) b += 0.012; else if(P.par.afinidade<35) b -= 0.02; }
+  if(P.vida.dinheiro < 0) b -= 0.015;
+  if(acao==="passe" && nivelHobby("leitura")>=1) b += 0.008*nivelHobby("leitura");
+  if((acao==="chute"||acao==="cabeca") && nivelHobby("arte")>=1) b += 0.008*nivelHobby("arte");
+  if(acao==="drible" && nivelHobby("codigo")>=1) b += 0.008*nivelHobby("codigo");
+  if((acao==="segura"||acao==="fim_defesa") && nivelHobby("musica")>=1) b += 0.008*nivelHobby("musica");
+  if(P.mente.felicidade>=70) b += 0.008;
+  return b;
+}
+function resumoFora(){
+  const itens = [];
+  if(P.par && P.par.status==="namoro") itens.push(P.par.afinidade>=60 ? `${P.par.nome} te dá segurança` : P.par.afinidade<35 ? `relação com ${P.par.nome} te distrai` : `namoro com ${P.par.nome}`);
+  if(P.vida.dinheiro < 0) itens.push("contas no vermelho pesam");
+  for(const h of HOBBIES){ if(nivelHobby(h.id)>=1) itens.push(`${h.nome.toLowerCase()} (nível ${nivelHobby(h.id)})`); }
+  if(P.mente.felicidade>=70) itens.push("bom humor");
+  return itens.length ? itens.join(" · ") : "nada em destaque fora de campo";
+}
 /* ===== The Fenômeno: nota OVR, níveis, ranking e modo rápido ===== */
 function ovr(){
   const at = Object.values(P.at);
@@ -2466,6 +2543,7 @@ if(P){
   P.resultados = P.resultados || {};
   P.filaEventos = P.filaEventos || [];
   P.vida.dividas = P.vida.dividas || []; P.vida.investimentos = P.vida.investimentos || {rf:0,acoes:0}; P.hobbies = P.hobbies || {}; P.pessoalSemana = P.pessoalSemana || null;
+  P.temp = P.temp || {jogos:0,gols:0,assist:0,notas:[]}; P.temporadas = P.temporadas || []; P.ovrPico = P.ovrPico || 0; P.stats.chuteiras = P.stats.chuteiras || 0; P.stats.luvas = P.stats.luvas || 0;
   P.modo = P.modo || "completo"; P.nivel = P.nivel || "amador"; P.stats.bolas = P.stats.bolas || 0; P.golsTemp = P.golsTemp || 0;
 }
 render();
