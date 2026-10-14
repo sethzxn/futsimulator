@@ -114,8 +114,17 @@
   .hero h2{font-weight:900;font-size:clamp(26px,4.5vw,40px);letter-spacing:-.5px}
   .hero .mut{color:#c4c4cc}
   .kicker{font-family:var(--title);font-size:12px;font-weight:800;letter-spacing:2px;text-transform:uppercase}
-  .card{background:var(--paper);border-color:var(--line)}
+  .card{background:var(--paper);border-color:var(--line);border-top:2px solid var(--gold);border-radius:6px}
+  .card h3{font-family:'Bebas Neue',var(--title);font-size:20px;font-weight:400;letter-spacing:1.5px;color:var(--gold)}
+  .hero h2,.brand,.kicker,.sec-num{font-family:'Bebas Neue',var(--title);letter-spacing:1.5px;text-transform:uppercase}
+  .hero h2{font-size:clamp(40px,7vw,64px);font-weight:400;line-height:.95}
+  .brand{font-size:30px;font-weight:400}
   .stat b{color:var(--ink)}
+  /* minigame de pênalti */
+  .pen-meter{height:18px;border-radius:9px;background:linear-gradient(90deg,#7f1d1d,#a16207 35%,#15803d 50%,#a16207 65%,#7f1d1d);position:relative;margin:12px 0}
+  .pen-needle{position:absolute;top:-4px;width:4px;height:26px;background:#fff;border-radius:2px;left:0}
+  .pen-alvos{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+  .pen-alvos button.b.on{border-color:var(--gold);background:#221c06}
   button.b{background:var(--paper2);color:var(--ink);border-color:var(--line2)}
   button.b:hover{border-color:var(--gold);background:#221c06}
   button.b:disabled{background:var(--paper)}
@@ -166,7 +175,7 @@
     .tk-track{font-size:11px}
   }
 </style>
-<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Kaushan+Script&family=Archivo:wdth,wght@62..125,400..900&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Kaushan+Script&family=Archivo:wdth,wght@62..125,400..900&family=Bebas+Neue&display=swap" rel="stylesheet">
 </head>
 <body>
 <header>
@@ -228,6 +237,16 @@ const ATIVIDADES = [
 ];
 
 const EVENTOS = [
+  { id:"momento_decisivo", peso:2, cond:s=>s.semana>=2,
+    titulo:"Momento decisivo", texto:"O juiz marca contra e o estádio explode. Dá pra ir pra cima dele — ou engolir e voltar pro jogo.",
+    opcoes:[
+      {t:"Reclamar na cara dele", efeito:{reputacao:-2,estresse:-1}, fx:()=>{ P.mente.disciplina = clamp((P.mente.disciplina||50)-3,0,100); P.rel.treinador = clamp(P.rel.treinador-2,0,100); }, log:"Você foi pra cima do árbitro. A torcida rugiu, e o técnico passou a semana falando disso."},
+      {t:"Engolir e jogar", efeito:{estresse:+2,felicidade:+1}, fx:()=>{ P.rel.treinador = clamp(P.rel.treinador+2,0,100); }, log:"Você engoliu a marcação e voltou pro jogo. O técnico notou a cabeça no lugar."} ]},
+  { id:"rumor_transferencia", peso:1, cond:s=>s.semana>=10 && s.mente.reputacao>=20,
+    titulo:"Rumor de transferência", texto:"A imprensa diz que um clube de outra divisão está monitorando você. Seu empresário quer saber o que fazer.",
+    opcoes:[
+      {t:"Mandar o empresário sondar", efeito:{estresse:+2,reputacao:+2}, log:"Seu empresário começou a sondar o mercado."},
+      {t:"Ignorar e focar no clube", efeito:{felicidade:+2}, fx:()=>{ P.rel.treinador = clamp(P.rel.treinador+1,0,100); }, log:"Você ignorou os rumores e focou no time."} ]},
   { id:"conversa_futuro", peso:2, cond:s=>s.par && s.par.status==="namoro",
     titulo:"Conversa sobre o futuro", texto:"Seu namoro chega a um ponto de decisão: morar junto ou manter cada um na sua casa?",
     opcoes:[
@@ -840,7 +859,27 @@ function gerarTemporada(){
     forca: Object.fromEntries(times.map(n => [n, r(42,68)])),
   };
   P.liga.forca[nomeP] = clamp(P.liga.forca[nomeP] ?? 52, 42, 68);
+  P.liga.metas = [
+    {id:"meio", texto:`Terminar na primeira metade da tabela (até ${Math.ceil(times.length/2)}º)`, alvo:Math.ceil(times.length/2)},
+    {id:"gols", texto:"Marcar 8 gols na temporada", alvo:8},
+  ];
   P.calendario = gerarCalendario(times);
+}
+
+// Posição atual do clube na tabela (1 = líder).
+function posicaoAtual(){
+  const tab = [...(P.liga?.tabela||[])].sort((a,b)=> b.pts-a.pts || (b.gp-b.gc)-(a.gp-a.gc));
+  return tab.findIndex(t=>t.nome===P.carreira.clube)+1;
+}
+// Progresso de uma meta: { ok, atual } — "atual" é o que o jogador já conseguiu.
+function progressoMeta(m){
+  if(m.id==="gols") return { ok:(P.temp?.gols||0) >= m.alvo, atual:P.temp?.gols||0 };
+  if(m.id==="meio"){ const p=posicaoAtual(); return { ok:p>0 && p<=m.alvo, atual:p }; }
+  return { ok:false, atual:0 };
+}
+// Poder de barganha em negociações de contrato: reputação, humor com o treinador e confiança.
+function poderBarganha(){
+  return clamp(0.2 + (P.mente.reputacao||0)/200 + ((P.rel?.treinador??50)-50)/250, 0.1, 0.9);
 }
 
 function forcaTime(n){ return P.liga?.forca?.[n] ?? 50; }
@@ -1560,16 +1599,23 @@ function fecharTemporada(){
   P.temporadas.push({ano:P.liga.temporada, clube:P.carreira.clube, pos, jogos:t.jogos, gols:t.gols, assist:t.assist, nota:Number(notaMedia.toFixed(2))});
   if(t.gols>=10){ P.stats.chuteiras = (P.stats.chuteiras||0)+1; log("Chuteira de Ouro: você foi o artilheiro da temporada.", "conquista"); }
   if(posCod(P.perfil.posicao)==="GOL" && notaMedia>=7.2){ P.stats.luvas = (P.stats.luvas||0)+1; log("Luva de Ouro: sua temporada no gol foi de elite.", "conquista"); }
+  // metas do clube: cada meta cumprida dá bônus; cada uma não cumprida pesa no treinador
+  const metasRes = (P.liga?.metas||[]).map(m=>({m, ...progressoMeta(m)}));
+  for(const x of metasRes){
+    if(x.ok){ P.vida.dinheiro += 500; P.mente.reputacao = clamp(P.mente.reputacao+2,0,100); P.rel.treinador = clamp(P.rel.treinador+5,0,100); log(`Meta cumprida: ${x.m.texto}.`, "conquista"); }
+    else { P.rel.treinador = clamp(P.rel.treinador-5,0,100); log(`Meta não cumprida: ${x.m.texto}.`, "evento"); }
+  }
   P.temp = {jogos:0,gols:0,assist:0,notas:[]};
   P.golsTemp = 0;
   // renovação de contrato: a proposta depende do desempenho
   const ganhoBase = pos<=3 ? 0.3 : pos<=6 ? 0.15 : 0.05;
+  const barganha = Math.round(poderBarganha()*100);
   P.eventoAtual = {
     id:"renovacao", titulo:"Renovação de contrato",
-    texto:`O clube quer renovar seu contrato. Você terminou em ${pos}º lugar e o salário atual é R$ ${P.carreira.salario}/mês.`,
+    texto:`O clube quer renovar seu contrato. Você terminou em ${pos}º lugar e o salário atual é R$ ${P.carreira.salario}/mês. Poder de barganha: ${barganha}%.`,
     opcoes:[
       {t:`Aceitar a proposta (+${Math.round(ganhoBase*100)}%)`, efeito:{}, fx:()=>{ P.carreira.salario = Math.round(P.carreira.salario*(1+ganhoBase)); }, log:"Você renovou o contrato."},
-      {t:"Pedir um aumento maior", efeito:{estresse:+4}, sorte:{p:0.5,ganho:0,perda:0}, fx:()=>{ const sobe = Math.random()<0.5; P.carreira.salario = Math.round(P.carreira.salario*(sobe?1+ganhoBase*2:1)); }, log:"Você negociou com dureza."},
+      {t:`Pedir um aumento maior (${barganha}% de chance)`, efeito:{estresse:+4}, fx:()=>{ const sobe = Math.random()<poderBarganha(); P.carreira.salario = Math.round(P.carreira.salario*(sobe?1+ganhoBase*2:1)); log(sobe?"O clube aceitou subir seu salário.":"O clube manteve a proposta original.", "evento"); }, log:"Você negociou com dureza."},
       {t:"Recusar e buscar outro clube", efeito:{reputacao:+2,felicidade:-3}, fx:()=>{ P.filaEventos=P.filaEventos||[]; P.filaEventos.push(gerarProposta()); }, log:"Você recusou e vai procurar outro clube."},
     ]
   };
@@ -1652,6 +1698,53 @@ function telaCriador(){
     </div>`;
 }
 
+/* ---------- Minigame de pênalti (mira + medidor "pare no verde") ---------- */
+const PEN_ALVOS = [
+  {id:"TL", nome:"Alto esquerdo", col:"esq"}, {id:"TR", nome:"Alto direito", col:"dir"}, {id:"C", nome:"Centro", col:"meio"},
+  {id:"BL", nome:"Baixo esquerdo", col:"esq"}, {id:"BR", nome:"Baixo direito", col:"dir"},
+];
+const penal = {alvo:null, pos:0, dir:1, timer:null};
+function penEscolher(id){ penal.alvo = id; render(); }
+function penIniciar(){
+  if(penal.timer || !penal.alvo) return;
+  penal.pos = 0; penal.dir = 1;
+  penal.timer = setInterval(()=>{
+    penal.pos += penal.dir * 0.02; if(penal.pos>=1 || penal.pos<=0) penal.dir *= -1;
+    const n = document.getElementById("pen-needle"); if(n) n.style.left = `calc(${(penal.pos*100).toFixed(1)}% - 2px)`;
+  }, 16);
+  render();
+}
+function penBater(){
+  if(!penal.timer) return;
+  clearInterval(penal.timer); penal.timer = null;
+  const alvo = PEN_ALVOS.find(a=>a.id===penal.alvo);
+  const verde = Math.abs(penal.pos-0.5) < 0.08;
+  const goleiro = pick(["esq","meio","dir"]);
+  const chance = goleiro!==alvo.col ? (verde ? 0.85 : 0.6) : (verde ? 0.2 : 0.05);
+  const gol = Math.random() < chance;
+  if(gol){ P.mente.reputacao = clamp(P.mente.reputacao+1,0,100); P.mente.felicidade = clamp(P.mente.felicidade+3,0,100); P.vida.dinheiro += 200; }
+  else { P.mente.estresse = clamp(P.mente.estresse+3,0,100); P.mente.felicidade = clamp(P.mente.felicidade-2,0,100); }
+  const txt = gol ? `Pênalti ${alvo.nome.toLowerCase()}: GOL! O goleiro ${goleiro==="meio"?"ficou no meio":goleiro==="esq"?"foi para a esquerda":"foi para a direita"}.`
+                  : `Pênalti ${alvo.nome.toLowerCase()}: defendeu. O goleiro estudou seus pênaltis.`;
+  log(txt, gol?"conquista":"evento");
+  P.penDia = P.semana; penal.alvo = null;
+  salvar(); render();
+}
+function cardPenalti(){
+  if(P.penDia===P.semana) return `<div class="card"><h3>Pênalti</h3><p class="mut">Você já cobrou um pênalti nesta semana.</p></div>`;
+  const escolha = PEN_ALVOS.map(a=>`<button class="b ${penal.alvo===a.id?"on":""}" onclick="penEscolher('${a.id}')">${a.id}</button>`).join("");
+  const acao = !penal.alvo ? `<p class="mut">Escolha onde mirar.</p>`
+    : !penal.timer ? `<div class="btns"><button class="b primary" onclick="penIniciar()">Preparar cobrança ▶</button></div>`
+    : `<div class="pen-meter"><div class="pen-needle" id="pen-needle"></div></div>
+       <div class="btns"><button class="b primary" onclick="penBater()">BATER</button></div>`;
+  return `<div class="card">
+    <h3>Pênalti · cobrança</h3>
+    <p class="mut">Escolha o canto e pare o medidor no verde.</p>
+    <div class="pen-alvos">${escolha}</div>
+    ${acao}
+  </div>`;
+}
+
 function telaInicio(){
   const ev = P.eventoAtual ? `
     <div class="card ev">
@@ -1700,6 +1793,12 @@ function telaInicio(){
   const noticias = (P.noticias||[]).slice(0,3).map(n=>`<p>${n.t}</p>`).join("");
   const cardNoticias = noticias ? `<div class="card"><h3>Notícias</h3><div class="log">${noticias}</div></div>` : "";
 
+  const cardMetas = (P.liga?.metas||[]).length ? `
+    <div class="card">
+      <h3>Metas do clube</h3>
+      ${P.liga.metas.map(m=>{ const pg=progressoMeta(m); return `<p>${pg.ok?"✔":"○"} ${m.texto} <span class="mut">(${m.id==="gols"?`${pg.atual}/${m.alvo} gols`:`${pg.atual}º agora`})</span></p>`; }).join("")}
+    </div>` : "";
+
   const podeAtividade = P.diaAtividade !== P.diaAbs;
   const treinou = jaTreinouNestaSemana();
   const bloqueio = P.eventoAtual ? "Resolva o evento para continuar."
@@ -1730,6 +1829,8 @@ function telaInicio(){
     ${ev}
     ${ultimo}
     ${cardNoticias}
+    ${cardMetas}
+    ${!P.eventoAtual && !jogoPendenteHoje() && !P.partida ? cardPenalti() : ""}
     <div class="card">
       <h3>Ações de hoje</h3>
       <div class="btns">
