@@ -208,58 +208,134 @@ const EVENTOS = [
 /* =========================================================
    CRIAÇÃO DE PERSONAGEM
    ========================================================= */
-const SKINS = ["#f6d7b0","#e8b98a","#c98e5f","#a86a43","#7a4a2c","#4d2e1b"];
-const HAIR_COLORS = ["#1a1410","#4a3320","#8a5a2b","#d9a85b","#b0b0b0","#c2410c"];
+const APDEF = { pele:1, rosto:0, olhos:0, corOlhos:0, sobrancelha:0, nariz:0, boca:0, cabelo:1, cabeloCor:1, barba:0, sardas:false, bochecha:false, camisa:0 };
+
+const SKINS = ["#fde4c8","#f3c9a0","#dca57a","#b9825a","#8a5a3b","#5a3a24"];
+const HAIR_COLORS = ["#16110d","#4a3320","#8a5a2b","#d9a85b","#c9ccd4","#c2410c","#2563eb","#f472b6","#eef0f6","#16a34a"];
+const EYE_COLORS = ["#2b1d14","#3b6e4f","#2f5d9e","#6b4fa0","#8a6a2e","#b04a4a"];
 const SHIRTS = ["#22d3a0","#6366f1","#ef4444","#eab308","#3b82f6","#f8fafc"];
-const HAIR_STYLES = [
-  {id:"calvo", nome:"Raspado"},
-  {id:"curto", nome:"Curto"},
-  {id:"cacheado", nome:"Cacheado"},
-  {id:"longo", nome:"Longo"},
-  {id:"moicano", nome:"Moicano"},
+
+const ROSTOS = [{id:0,nome:"Oval"},{id:1,nome:"Fino"},{id:2,nome:"Quadrado"},{id:3,nome:"Redondo"}];
+const OLHOS = [{id:0,nome:"Amendoado"},{id:1,nome:"Grande"},{id:2,nome:"Afiado"},{id:3,nome:"Sonolento"}];
+const SOBRANCELHAS = [{id:0,nome:"Fina"},{id:1,nome:"Grossa"},{id:2,nome:"Arqueada"},{id:3,nome:"Reta"}];
+const NARIZES = [{id:0,nome:"Pequeno"},{id:1,nome:"Reto"},{id:2,nome:"Arrebitado"},{id:3,nome:"Largo"}];
+const BOCAS = [{id:0,nome:"Sorriso"},{id:1,nome:"Neutra"},{id:2,nome:"Grito"},{id:3,nome:"Dentes"}];
+const CABELOS = [
+  {id:0,nome:"Raspado"},{id:1,nome:"Espetado"},{id:2,nome:"Franja"},{id:3,nome:"Bagunçado"},{id:4,nome:"Longo"},
+  {id:5,nome:"Moicano"},{id:6,nome:"Cacheado"},{id:7,nome:"Pontudo"},{id:8,nome:"Bob"},
 ];
-const BARBAS = [{id:"nenhuma", nome:"Sem barba"},{id:"por_fazer", nome:"Por fazer"},{id:"barba", nome:"Barba"}];
+const BARBAS = [{id:0,nome:"Sem barba"},{id:1,nome:"Sombra"},{id:2,nome:"Barba"}];
 
-function avatarSVG(ap){
-  const skin = SKINS[ap.pele] ?? SKINS[1];
-  const hair = HAIR_COLORS[ap.cabeloCor] ?? HAIR_COLORS[0];
-  const shirt = SHIRTS[ap.camisa] ?? SHIRTS[0];
-  const estilo = ap.cabelo || "curto";
-  const barba = ap.barba || "nenhuma";
+const FACES = [
+  "M100 46 C138 46 148 84 146 110 C144 142 124 158 100 158 C76 158 56 142 54 110 C52 84 62 46 100 46Z",
+  "M100 42 C132 42 142 84 140 112 C138 144 120 160 100 160 C80 160 62 144 60 112 C58 84 68 42 100 42Z",
+  "M62 50 L138 50 Q146 50 146 60 L146 120 Q146 156 100 160 Q54 156 54 120 L54 60 Q54 50 62 50Z",
+  "M100 44 C140 44 150 86 148 110 C146 146 126 158 100 158 C74 158 54 146 52 110 C50 86 60 44 100 44Z",
+];
 
-  const trasCabelo = estilo==="longo"
-    ? `<path d="M46 86 Q40 28 100 28 Q160 28 154 86 L162 156 Q140 146 136 124 L64 124 Q60 146 38 156Z" fill="${hair}"/>` : "";
-  const frenteCabelo = {
-    calvo: `<ellipse cx="100" cy="58" rx="46" ry="14" fill="${hair}" opacity=".25"/>`,
-    curto: `<path d="M52 82 Q50 34 100 32 Q150 34 148 82 Q140 54 100 54 Q60 54 52 82Z" fill="${hair}"/>`,
-    cacheado: `<g fill="${hair}"><circle cx="60" cy="52" r="15"/><circle cx="80" cy="40" r="16"/><circle cx="100" cy="36" r="16"/><circle cx="120" cy="40" r="16"/><circle cx="140" cy="52" r="15"/><circle cx="54" cy="72" r="12"/><circle cx="146" cy="72" r="12"/></g>`,
-    longo: `<path d="M52 82 Q50 36 100 34 Q150 36 148 82 Q140 56 100 56 Q60 56 52 82Z" fill="${hair}"/>`,
-    moicano: `<path d="M90 56 L100 12 L110 56 Z" fill="${hair}"/><path d="M52 82 Q52 52 100 52 Q148 52 148 82 Q140 60 100 60 Q60 60 52 82Z" fill="${hair}"/>`,
-  }[estilo] || "";
+const HAIRS = {
+  0:{ back:"", front:(c)=>`<ellipse cx="100" cy="66" rx="44" ry="20" fill="${c}" opacity=".35"/>` },
+  1:{ back:"", front:(c)=>`<path d="M54 84 L44 40 L70 58 L76 26 L94 50 L104 20 L116 50 L134 26 L130 58 L156 40 L146 84 Q130 52 100 52 Q70 52 54 84Z" fill="${c}"/>` },
+  2:{ back:"", front:(c)=>`<path d="M50 100 Q44 40 100 38 Q156 40 150 100 Q144 62 118 62 Q102 80 70 70 Q56 74 50 100Z" fill="${c}"/>` },
+  3:{ back:(c)=>`<path d="M46 118 Q36 56 100 36 Q164 56 154 118 Q140 110 128 116 L72 116 Q60 110 46 118Z" fill="${c}"/>`,
+      front:(c)=>`<path d="M54 92 Q50 44 100 42 Q150 44 146 92 Q130 64 110 66 Q104 52 92 60 Q74 58 54 92Z" fill="${c}"/>` },
+  4:{ back:(c)=>`<path d="M46 104 Q36 46 100 36 Q164 46 154 104 L162 170 Q132 160 124 130 L76 130 Q68 160 38 170Z" fill="${c}"/>`,
+      front:(c)=>`<path d="M54 96 Q50 42 100 40 Q150 42 146 96 Q132 64 100 62 Q70 64 54 96Z" fill="${c}"/>` },
+  5:{ back:"", front:(c)=>`<path d="M54 84 Q52 50 100 48 Q148 50 146 84 Q136 62 100 60 Q64 62 54 84Z" fill="${c}"/><path d="M86 58 L100 8 L114 58Z" fill="${c}"/>` },
+  6:{ back:(c)=>`<g fill="${c}"><circle cx="48" cy="96" r="14"/><circle cx="152" cy="96" r="14"/><circle cx="54" cy="130" r="14"/><circle cx="146" cy="130" r="14"/></g>`,
+      front:(c)=>`<g fill="${c}"><circle cx="60" cy="52" r="15"/><circle cx="80" cy="40" r="16"/><circle cx="100" cy="36" r="16"/><circle cx="120" cy="40" r="16"/><circle cx="140" cy="52" r="15"/><circle cx="54" cy="72" r="11"/><circle cx="146" cy="72" r="11"/></g>` },
+  7:{ back:(c)=>`<path d="M62 74 L22 50 L60 92Z M138 74 L178 50 L140 92Z M100 42 L94 6 L112 40Z" fill="${c}"/>`,
+      front:(c)=>`<path d="M52 96 Q44 44 100 40 Q156 44 148 96 Q140 66 100 64 Q60 66 52 96Z" fill="${c}"/>` },
+  8:{ back:(c)=>`<path d="M48 124 Q42 58 100 46 Q158 58 152 124 Q140 112 100 112 Q60 112 48 124Z" fill="${c}"/>`,
+      front:(c)=>`<path d="M56 92 Q52 48 100 46 Q148 48 144 92 Q132 66 100 66 Q68 66 56 92Z" fill="${c}"/>` },
+};
 
-  const barbaSVG = {
-    nenhuma: "",
-    por_fazer: `<path d="M70 118 Q100 150 130 118 Q124 140 100 146 Q76 140 70 118Z" fill="${hair}" opacity=".3"/>`,
-    barba: `<path d="M68 112 Q70 150 100 152 Q130 150 132 112 Q124 130 100 132 Q76 130 68 112Z" fill="${hair}"/>`,
-  }[barba];
+function olho(cx, cy, tipo, cor, pele){
+  const rx = tipo===1 ? 12 : 9;
+  const ry = tipo===1 ? 13 : 10;
+  let s = `<ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="#fff"/>`;
+  s += `<ellipse cx="${cx}" cy="${cy+1}" rx="${rx-3}" ry="${ry-2}" fill="${cor}"/>`;
+  s += `<ellipse cx="${cx}" cy="${cy+2}" rx="${(rx-3)/2}" ry="${(ry-2)/1.6}" fill="#0b0b0f"/>`;
+  s += `<circle cx="${cx+3}" cy="${cy-3}" r="${(rx*0.22).toFixed(1)}" fill="#fff"/>`;
+  if(tipo===0) s += `<path d="M${cx-rx} ${cy-2} Q${cx} ${cy-ry-4} ${cx+rx} ${cy-2}" stroke="#0b0b0f" stroke-width="2.5" fill="none" stroke-linecap="round"/>`;
+  if(tipo===1) s += `<path d="M${cx-rx-1} ${cy-4} Q${cx} ${cy-ry-3} ${cx+rx+1} ${cy-4}" stroke="#0b0b0f" stroke-width="2.5" fill="none" stroke-linecap="round"/>`;
+  if(tipo===2) s += `<path d="M${cx-rx} ${cy-6} L${cx+rx} ${cy-2}" stroke="#0b0b0f" stroke-width="3" stroke-linecap="round"/>`;
+  if(tipo===3){
+    s += `<path d="M${cx-rx-2} ${cy-ry+6} L${cx+rx+2} ${cy-ry+6} L${cx+rx+2} ${cy-ry-6} L${cx-rx-2} ${cy-ry-6}Z" fill="${pele}"/>`;
+    s += `<path d="M${cx-rx-1} ${cy-ry+6} L${cx+rx+1} ${cy-ry+6}" stroke="#0b0b0f" stroke-width="2.5" stroke-linecap="round"/>`;
+  }
+  return s;
+}
+
+function sobrancelhaPath(t){
+  return [
+    `<path d="M72 88 Q83 82 95 84" stroke="#16110d" stroke-width="2.5" fill="none" stroke-linecap="round"/>`,
+    `<path d="M70 88 Q83 80 96 85" stroke="#16110d" stroke-width="6" fill="none" stroke-linecap="round"/>`,
+    `<path d="M72 90 Q84 74 96 86" stroke="#16110d" stroke-width="3.5" fill="none" stroke-linecap="round"/>`,
+    `<path d="M72 85 L95 84" stroke="#16110d" stroke-width="4" fill="none" stroke-linecap="round"/>`,
+  ][t] || "";
+}
+
+function narizPath(t){
+  const cor = "#8a4b2d";
+  return [
+    `<path d="M97 114 Q100 118 103 114" stroke="${cor}" fill="none" stroke-width="2" stroke-linecap="round"/>`,
+    `<path d="M100 104 L97 118 Q100 121 103 118" stroke="${cor}" fill="none" stroke-width="2" stroke-linecap="round"/>`,
+    `<path d="M96 116 Q98 122 103 118" stroke="${cor}" fill="none" stroke-width="2.2" stroke-linecap="round"/><circle cx="96" cy="116" r="1.2" fill="${cor}"/>`,
+    `<path d="M93 116 Q100 122 107 116" stroke="${cor}" fill="none" stroke-width="2" stroke-linecap="round"/><circle cx="96" cy="118" r="1.1" fill="${cor}"/><circle cx="104" cy="118" r="1.1" fill="${cor}"/>`,
+  ][t] || "";
+}
+
+function bocaPath(t){
+  return [
+    `<path d="M86 132 Q100 144 114 132" stroke="#8a2d3a" stroke-width="3" fill="none" stroke-linecap="round"/>`,
+    `<path d="M90 134 Q100 136 110 134" stroke="#8a2d3a" stroke-width="3" fill="none" stroke-linecap="round"/>`,
+    `<path d="M88 130 Q100 128 112 130 Q110 146 100 146 Q90 146 88 130Z" fill="#5a1d28"/>`,
+    `<path d="M86 130 Q100 146 114 130 Q100 134 86 130Z" fill="#7a2435"/><path d="M90 131 Q100 135 110 131 L108 134 Q100 137 92 134Z" fill="#fff"/>`,
+  ][t] || "";
+}
+
+function barbaPath(t, cor){
+  if(t===1) return `<path d="M62 124 Q70 164 100 166 Q130 164 138 124 Q130 142 100 146 Q70 142 62 124Z" fill="${cor}" opacity=".28"/>`;
+  if(t===2) return `<path d="M62 124 Q70 164 100 166 Q130 164 138 124 Q130 142 100 146 Q70 142 62 124Z" fill="${cor}"/>`;
+  return "";
+}
+
+function avatarSVG(ap0){
+  const a = {...APDEF, ...(ap0||{})};
+  const pele = SKINS[a.pele] ?? SKINS[1];
+  const cabelo = HAIR_COLORS[a.cabeloCor] ?? HAIR_COLORS[1];
+  const cor = EYE_COLORS[a.corOlhos] ?? EYE_COLORS[0];
+  const camisa = SHIRTS[a.camisa] ?? SHIRTS[0];
+  const hs = HAIRS[a.cabelo] ?? HAIRS[1];
+  const face = FACES[a.rosto] ?? FACES[0];
+
+  const barba = barbaPath(a.barba, cabelo);
+  const sardas = a.sardas ? [[78,118],[84,122],[90,118],[116,118],[122,122],[110,122]].map(([x,y])=>`<circle cx="${x}" cy="${y}" r="1.3" fill="#8a4b2d" opacity=".55"/>`).join("") : "";
+  const bochecha = a.bochecha ? `<ellipse cx="74" cy="124" rx="8" ry="4" fill="#ff8fa3" opacity=".45"/><ellipse cx="126" cy="124" rx="8" ry="4" fill="#ff8fa3" opacity=".45"/>` : "";
 
   return `
   <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" aria-label="avatar">
-    <defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1e2440"/><stop offset="1" stop-color="#0f3b33"/></linearGradient></defs>
-    <rect width="200" height="200" fill="url(#bg)"/>
-    ${trasCabelo}
-    <path d="M30 200 Q40 160 100 160 Q160 160 170 200Z" fill="${shirt}"/>
-    <rect x="88" y="136" width="24" height="30" fill="${skin}"/>
-    <ellipse cx="100" cy="98" rx="46" ry="56" fill="${skin}"/>
-    <ellipse cx="54" cy="100" rx="7" ry="11" fill="${skin}"/>
-    <ellipse cx="146" cy="100" rx="7" ry="11" fill="${skin}"/>
-    ${frenteCabelo}
-    ${barbaSVG}
-    <circle cx="82" cy="98" r="5" fill="#1b1b1b"/><circle cx="118" cy="98" r="5" fill="#1b1b1b"/>
-    <circle cx="84" cy="96" r="1.6" fill="#fff"/><circle cx="120" cy="96" r="1.6" fill="#fff"/>
-    <path d="M72 86 Q82 80 92 86" stroke="${hair}" stroke-width="4" fill="none" stroke-linecap="round"/>
-    <path d="M108 86 Q118 80 128 86" stroke="${hair}" stroke-width="4" fill="none" stroke-linecap="round"/>
-    <path d="M86 126 Q100 136 114 126" stroke="#6b2b2b" stroke-width="3" fill="none" stroke-linecap="round"/>
+    <defs><radialGradient id="avbg" cx="50%" cy="30%" r="80%"><stop offset="0" stop-color="#1c3a66"/><stop offset="1" stop-color="#0E2240"/></radialGradient></defs>
+    <rect width="200" height="200" fill="url(#avbg)"/>
+    <circle cx="100" cy="100" r="88" fill="none" stroke="#F2B705" stroke-opacity=".25" stroke-width="2"/>
+    <path d="M28 200 Q36 160 100 158 Q164 160 172 200Z" fill="${camisa}"/>
+    <path d="M86 158 Q100 172 114 158" stroke="rgba(0,0,0,.25)" stroke-width="3" fill="none"/>
+    <rect x="88" y="136" width="24" height="26" fill="${pele}"/>
+    <rect x="88" y="136" width="24" height="8" fill="rgba(0,0,0,.12)"/>
+    ${hs.back ? (typeof hs.back==="function" ? hs.back(cabelo) : hs.back) : ""}
+    <ellipse cx="54" cy="106" rx="7" ry="12" fill="${pele}"/>
+    <ellipse cx="146" cy="106" rx="7" ry="12" fill="${pele}"/>
+    <path d="${face}" fill="${pele}"/>
+    ${bochecha}${sardas}
+    ${typeof hs.front==="function" ? hs.front(cabelo) : hs.front}
+    ${barba}
+    ${olho(84,102,a.olhos,cor,pele)}
+    <g transform="translate(200 0) scale(-1 1)">${olho(84,102,a.olhos,cor,pele)}</g>
+    ${sobrancelhaPath(a.sobrancelha)}
+    <g transform="translate(200 0) scale(-1 1)">${sobrancelhaPath(a.sobrancelha)}</g>
+    ${narizPath(a.nariz)}
+    ${bocaPath(a.boca)}
   </svg>`;
 }
 
@@ -275,7 +351,7 @@ function iniciarCriador(){
   C = {
     passo:0,
     nome:"", sobrenome:"", pais:"Brasil", cidade:"", timeCoracao:"", clubeBase:"valmont",
-    aparencia:{pele:1, cabelo:"curto", cabeloCor:1, barba:"nenhuma", camisa:0},
+    aparencia:{...APDEF},
     foto:null,
     origem:"media", posicao:"Atacante", motivacao:"",
     /* posicao e motivacao têm valor inicial para não aparecer "undefined" na tela */
@@ -297,22 +373,49 @@ function passoIdentidade(){
     <select id="c_clube">${clubes}</select>`;
 }
 
+function chips(key, lista){
+  return `<div class="opts">${lista.map(o=>`<div class="opt ${C.aparencia[key]===o.id?"on":""}" onclick="setAp('${key}',${o.id})">${o.nome}</div>`).join("")}</div>`;
+}
+function swatches(key, cores){
+  return `<div class="opts">${cores.map((c,i)=>`<div class="opt ${C.aparencia[key]===i?"on":""}" title="${c}" style="background:${c};width:34px;height:34px;padding:0" onclick="setAp('${key}',${i})"></div>`).join("")}</div>`;
+}
+function toggle(key, label){
+  return `<div class="opt ${C.aparencia[key]?"on":""}" onclick="setAp('${key}',${!C.aparencia[key]})">${label}</div>`;
+}
+function sortearAparencia(){
+  coletar();
+  C.aparencia = {
+    pele:r(0,5), rosto:r(0,3), olhos:r(0,3), corOlhos:r(0,5), sobrancelha:r(0,3), nariz:r(0,3), boca:r(0,3),
+    cabelo:r(0,8), cabeloCor:r(0,9), barba:r(0,2), sardas:Math.random()<0.2, bochecha:Math.random()<0.4, camisa:r(0,5),
+  };
+  render();
+}
+
 function passoAparencia(){
-  const pele = SKINS.map((c,i)=>`<div class="opt ${C.aparencia.pele===i?"on":""}" style="background:${c};width:34px;height:34px;padding:0" onclick="setAp('pele',${i})"></div>`).join("");
-  const cabelo = HAIR_STYLES.map(h=>`<div class="opt ${C.aparencia.cabelo===h.id?"on":""}" onclick="setAp('cabelo','${h.id}')">${h.nome}</div>`).join("");
-  const cor = HAIR_COLORS.map((c,i)=>`<div class="opt ${C.aparencia.cabeloCor===i?"on":""}" style="background:${c};width:34px;height:34px;padding:0" onclick="setAp('cabeloCor',${i})"></div>`).join("");
-  const barba = BARBAS.map(b=>`<div class="opt ${C.aparencia.barba===b.id?"on":""}" onclick="setAp('barba','${b.id}')">${b.nome}</div>`).join("");
-  const camisa = SHIRTS.map((c,i)=>`<div class="opt ${C.aparencia.camisa===i?"on":""}" style="background:${c};width:34px;height:34px;padding:0" onclick="setAp('camisa',${i})"></div>`).join("");
+  const ap = C.aparencia;
   return `
-    <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap">
-      <div class="avatar" id="previewAvatar">${C.foto?`<img src="${C.foto}" alt="">`:avatarSVG(C.aparencia)}</div>
-      <div class="mut" style="flex:1;min-width:200px">Monte o avatar ou envie uma foto. Se enviar foto, ela substitui o avatar.</div>
+    <div style="display:flex;gap:18px;align-items:center;flex-wrap:wrap;margin-bottom:6px">
+      <div class="avatar" id="previewAvatar" style="width:150px;height:150px">${C.foto?`<img src="${C.foto}" alt="">`:avatarSVG(ap)}</div>
+      <div style="flex:1;min-width:200px">
+        <p class="mut" style="margin:0 0 10px">Monte o rosto do seu personagem, ou envie uma foto. Se enviar foto, ela substitui o avatar.</p>
+        <button class="b" onclick="sortearAparencia()">🎲 Sortear aparência</button>
+      </div>
     </div>
-    <label>Pele</label><div class="opts">${pele}</div>
-    <label>Cabelo</label><div class="opts">${cabelo}</div>
-    <label>Cor do cabelo</label><div class="opts">${cor}</div>
-    <label>Barba</label><div class="opts">${barba}</div>
-    <label>Cor da camisa</label><div class="opts">${camisa}</div>
+
+    <label>Rosto</label>${chips("rosto", ROSTOS)}
+    <label>Pele</label>${swatches("pele", SKINS)}
+    <label>Olhos</label>${chips("olhos", OLHOS)}
+    <label>Cor dos olhos</label>${swatches("corOlhos", EYE_COLORS)}
+    <label>Sobrancelhas</label>${chips("sobrancelha", SOBRANCELHAS)}
+    <label>Nariz</label>${chips("nariz", NARIZES)}
+    <label>Boca</label>${chips("boca", BOCAS)}
+    <label>Cabelo</label>${chips("cabelo", CABELOS)}
+    <label>Cor do cabelo</label>${swatches("cabeloCor", HAIR_COLORS)}
+    <label>Barba</label>${chips("barba", BARBAS)}
+    <label>Detalhes</label>
+    <div class="opts">${toggle("sardas","Sardas")}${toggle("bochecha","Bochechas coradas")}</div>
+    <label>Cor da camisa</label>${swatches("camisa", SHIRTS)}
+
     <label>Foto (opcional)</label>
     <input type="file" accept="image/*" onchange="enviarFoto(this)">
     ${C.foto?`<button class="b" style="margin-top:8px" onclick="removerFoto()">Remover foto</button>`:""}`;
@@ -573,7 +676,7 @@ function render(){
   if(!P){
     app().innerHTML = `
       <section class="hero">
-        <div class="avatar">${avatarSVG({pele:2,cabelo:"cacheado",cabeloCor:0,barba:"por_fazer",camisa:0})}</div>
+        <div class="avatar">${avatarSVG({pele:2,rosto:0,olhos:2,corOlhos:2,sobrancelha:0,nariz:1,boca:0,cabelo:7,cabeloCor:6,barba:0,sardas:true,bochecha:true,camisa:2})}</div>
         <div><h2>Sua vida, sua carreira</h2>
         <p class="mut">Crie seu personagem, escolha sua origem e escreva a história. Depois, cada semana é uma decisão.</p>
         <button class="b primary" onclick="iniciarCriador()">Criar personagem</button></div>
