@@ -228,6 +228,17 @@ const ATIVIDADES = [
 ];
 
 const EVENTOS = [
+  { id:"conversa_futuro", peso:2, cond:s=>s.par && s.par.status==="namoro",
+    titulo:"Conversa sobre o futuro", texto:"Seu namoro chega a um ponto de decisão: morar junto ou manter cada um na sua casa?",
+    opcoes:[
+      {t:"Propor morar junto", efeito:{felicidade:+5,estresse:+3,dinheiro:-500}, fx:()=>{ P.par.afinidade=clamp(P.par.afinidade+8,0,100); }, log:"Você propôs morar junto."},
+      {t:"Pedir mais tempo", efeito:{estresse:+1}, fx:()=>{ P.par.afinidade=clamp(P.par.afinidade-3,0,100); }, log:"Você pediu mais tempo."},
+      {t:"Adiar a conversa", efeito:{estresse:+2,felicidade:-2}, log:"Você adiou a conversa."} ]},
+  { id:"fa_viraliza", peso:2, cond:s=>s.par,
+    titulo:"Vídeo que viralizou", texto:"Um vídeo de você com uma fã viralizou, e a sua pessoa ficou desconfiada.",
+    opcoes:[
+      {t:"Explicar tudo com calma", efeito:{reputacao:+1,estresse:+2}, fx:()=>{ P.par.afinidade=clamp(P.par.afinidade+2,0,100); }, log:"Você explicou a situação."},
+      {t:"Fazer piada e seguir", efeito:{felicidade:+2,reputacao:-1}, fx:()=>{ P.par.afinidade=clamp(P.par.afinidade-4,0,100); }, log:"Você levou na brincadeira."} ]},
   { id:"patrocinio", peso:2, cond:s=>s.semana>=8,
     titulo:"Patrocínio local", texto:"Uma loja da cidade quer estampar seu nome na camisa de treino.",
     opcoes:[
@@ -661,6 +672,7 @@ function criarPersonagem(){
     historico: [], tela: "inicio",
   };
   gerarTemporada();
+  P.vida.dividas = []; P.vida.investimentos = {rf:0, acoes:0}; P.hobbies = {}; P.par = null; P.filaEventos = []; P.modo = 'completo'; P.nivel = 'amador'; P.golsTemp = 0; P.pessoalSemana = null;
   C = null;
   log(`${P.perfil.nome} começa na base do ${clubeEscolhido.nome} aos 14 anos.`, "evento");
   salvar(); render();
@@ -968,22 +980,6 @@ function gerarProposta(){
       {t:`Aceitar e mudar para o ${clube}`, efeito:{reputacao:+3,felicidade:-2,rel_familia:-2}, fx:()=>{ P.carreira.clube=clube; P.carreira.salario=salario; const niv=DADOS.clubes.find(c=>c.nome===clube)?.nivel; if(niv) P.carreira.nivel=niv; }, log:`Você aceitou a proposta do ${clube}.`},
       {t:"Ficar no clube atual", efeito:{felicidade:+2,rel_amigos:+3}, log:"Você decidiu ficar onde está."},
       {t:"Negociar um salário maior", efeito:{estresse:+3}, fx:()=>{ if(Math.random()<0.5){ P.carreira.salario=Math.round(P.carreira.salario*1.2); log("O clube aceitou subir seu salário.","evento"); } else { P.mente.reputacao=clamp(P.mente.reputacao-1,0,100); log("O clube esfriou a negociação e a proposta perdeu força.","evento"); } }, log:"Você negociou com o clube atual."},
-    ]
-  };
-}
-function eventoEntrevista(res, nota){
-  const abre = res==="V" ? "Você venceu e a imprensa quer ouvir você logo após o apito."
-    : res==="E" ? "Empate em campo, e os repórteres querem saber o que deu errado."
-    : "A derrota pesa, e os jornalistas esperam uma resposta.";
-  const cena = pick(["Um repórter pergunta sobre a sua atuação.","Uma câmera está a poucos centímetros do seu rosto.","Um colega observa de longe, esperando a sua fala.","Um microfone da rádio local aparece na sua frente."]);
-  return {
-    id:"entrevista_"+P.diaAbs, titulo:"Entrevista após o jogo",
-    texto:`${abre} Sua nota foi ${nota}. ${cena}`,
-    opcoes:[
-      {t:"Elogiar o time", efeito:{felicidade:+2}, fx:()=>{ P.rel.treinador=clamp(P.rel.treinador+2,0,100); }, log:"Você elogiou o grupo na entrevista."},
-      {t:"Assumir a responsabilidade", efeito:{estresse:+3,reputacao:+2}, log:"Você assumiu os erros em público."},
-      {t:"Falar do seu desempenho", efeito:{reputacao:+3,felicidade:-1}, fx:()=>{ P.rel.amigos=clamp(P.rel.amigos-2,0,100); }, log:"Você falou de si mesmo e incomodou alguns colegas."},
-      {t:"Desconversar", efeito:{estresse:-2,reputacao:-1}, log:"Você desconversou."},
     ]
   };
 }
@@ -1426,7 +1422,9 @@ function finalizarPartida(){
   P.resultados[pt.rodada] = `${pt.gP}x${pt.gA}`;
   P.ultimoJogo = { adv:pt.adv, placar:[pt.gP,pt.gA], res, nota:nota.toFixed(1), gj:pt.gJ, asj:pt.asJ, clima:pt.clima.nome, arbitragem:pt.arbitragem.nome, lesao: pt.lesionouJog, log: pt.log };
   log(`Partida vs ${pt.adv}: ${pt.gP}x${pt.gA}. Nota ${nota.toFixed(1)}.`, "jogo");
-  if(!P.eventoAtual && Math.random() < (res==="D"?0.35:0.4)) P.eventoAtual = eventoEntrevista(res, nota.toFixed(1));
+  P.filaEventos = P.filaEventos || [];
+  const entrevista = eventoEntrevista(res, nota.toFixed(1));
+  if(P.eventoAtual) P.filaEventos.unshift(entrevista); else P.eventoAtual = entrevista;
   P.jogoFeito = chaveSemana();
   P.partida = null;
   salvar(); render();
@@ -1504,21 +1502,6 @@ const NOTICIAS = [
 ];
 
 /* ---------- Compras ---------- */
-function comprar(tipo, id){
-  const lista = tipo==="veiculo" ? DADOS.veiculos : DADOS.casas;
-  const item = lista.find(x=>x.id===id);
-  if(P.vida.dinheiro < item.preco){ alert("Dinheiro insuficiente."); return; }
-  if(tipo==="veiculo"){
-    if(P.vida.veiculos.includes(id)) return;
-    P.vida.dinheiro -= item.preco; P.vida.veiculos.push(id);
-  } else {
-    if(P.vida.casa===id) return;
-    P.vida.dinheiro -= item.preco; P.vida.casa = id;
-  }
-  aplicar(item.bonus);
-  log(`Comprou: ${item.nome}`, "compra");
-  salvar(); render();
-}
 
 /* ---------- Atividades e semana ---------- */
 function atividade(id){
@@ -1545,6 +1528,9 @@ function fecharSemana(){
   if(P.corpo.saude < 60) P.mente.felicidade = clamp(P.mente.felicidade-1,0,100);
   declinioIdade();
 
+  cobrarDividas();
+  rendimentoSemanal();
+  semanaPessoal();
   P.semana++;
   if(P.semana === TEMPORADA_RODADAS+1) fecharTemporada();
   if(P.semana > 52){ P.semana = 1; P.ano++; P.idade++; log(`Aniversário: agora você tem ${P.idade} anos.`, "idade"); }
@@ -1598,7 +1584,7 @@ function ir(t){ P.tela=t; salvar(); render(); }
 const TELAS = [
   {id:"inicio", nome:"Hoje"}, {id:"treino", nome:"Treino"}, {id:"calendario", nome:"Calendário"},
   {id:"vida", nome:"Vida"}, {id:"compras", nome:"Compras"}, {id:"carreira", nome:"Carreira"},
-  {id:"ranking", nome:"Ranking"}, {id:"noticias", nome:"Notícias"}, {id:"historico", nome:"Histórico"}, {id:"perfil", nome:"Perfil"},
+  {id:"ranking", nome:"Ranking"}, {id:"pessoal", nome:"Pessoal"}, {id:"noticias", nome:"Notícias"}, {id:"historico", nome:"Histórico"}, {id:"perfil", nome:"Perfil"},
 ];
 
 function barra(v){ return `<div class="bar"><i style="width:${v}%"></i></div>`; }
@@ -1630,7 +1616,7 @@ function render(){
   }
   if(P.idade >= IDADE_MAX){ return aposentar(); }
   if(P.partida){ app().innerHTML = telaPartida(); return; }
-  const fn = {inicio:telaInicio, treino:telaTreino, calendario:telaCalendario, noticias:telaNoticias, ranking:telaRanking, vida:telaVida, compras:telaCompras, carreira:telaCarreira, historico:telaHistorico, perfil:telaPerfil}[P.tela] || telaInicio;
+  const fn = {inicio:telaInicio, treino:telaTreino, calendario:telaCalendario, noticias:telaNoticias, ranking:telaRanking, pessoal:telaPessoal, vida:telaVida, compras:telaCompras, carreira:telaCarreira, historico:telaHistorico, perfil:telaPerfil}[P.tela] || telaInicio;
   app().innerHTML = fn();
 }
 
@@ -2015,15 +2001,6 @@ function telaVida(){
     <div class="card"><h3>Estudo</h3><p class="mut">Pontos de estudo: <b>${P.estudo}</b></p></div>`;
 }
 
-function telaCompras(){
-  return `
-    <div class="card"><h3>Veículos</h3>
-      <div class="btns">${DADOS.veiculos.map(v=>`<button class="b" ${P.vida.dinheiro<v.preco||P.vida.veiculos.includes(v.id)?"disabled":""} onclick="comprar('veiculo','${v.id}')">${v.nome}<small>R$ ${v.preco.toLocaleString("pt-BR")} · manutenção R$ ${v.manut}/mês</small></button>`).join("")}</div>
-    </div>
-    <div class="card"><h3>Moradia</h3>
-      <div class="btns">${DADOS.casas.map(c=>`<button class="b" ${P.vida.dinheiro<c.preco||P.vida.casa===c.id?"disabled":""} onclick="comprar('casa','${c.id}')">${c.nome}<small>R$ ${c.preco.toLocaleString("pt-BR")}</small></button>`).join("")}</div>
-    </div>`;
-}
 
 function telaCarreira(){
   const n = P.stats.notas;
@@ -2086,6 +2063,287 @@ function aposentar(){
 }
 function aposentarAgora(){ if(confirm("Encerrar a carreira agora?")) aposentar(); }
 
+
+/* ===== Entrevistas pós-jogo: uma após cada partida, com manchetes que voltam como notícia ===== */
+const VEICULOS_ENTREVISTA = ["TV local","rádio esportiva","portal de notícias","podcast do bairro","canal de esportes","jornal impresso da cidade"];
+const PERG_ENTREVISTA = {
+  V: ["Como foi essa vitória para você?","O time parece mais forte. Concorda?","Qual foi o momento decisivo do jogo?","A torcida cantou o tempo todo. O que sentiu?","Dá para sonhar com o título?"],
+  E: ["O empate deixou a torcida dividida. O que achou?","Faltou ousadia no segundo tempo?","Vocês chegaram perto de vencer. Qual o sentimento?"],
+  D: ["A derrota foi justa ou injusta?","O que deu errado hoje?","A torcida cobrou bastante. Como lida com isso?","O treinador vai mudar algo?"],
+};
+const RESP_ENTREVISTA = {
+  V: [
+    {t:"Agradecer o grupo", efeito:{felicidade:+3}, rel:{treinador:+2}, manchete:"{nome} dedica a vitória ao grupo"},
+    {t:"Dizer que o mérito é do time", efeito:{reputacao:+1}, rel:{amigos:+1}, manchete:"{nome}: \"Foi trabalho coletivo\""},
+    {t:"Pedir foco no próximo jogo", efeito:{reputacao:+2,estresse:+1}, manchete:"{nome} já pensa no próximo adversário"},
+    {t:"Brincar com a torcida", efeito:{felicidade:+4,reputacao:+1,estresse:-1}, manchete:"{nome} arranca risadas em entrevista"},
+    {t:"Falar em título sem medo", efeito:{reputacao:+3,estresse:+2}, rel:{treinador:-1}, manchete:"{nome} fala em título e a torcida vibra"},
+  ],
+  E: [
+    {t:"Dizer que o empate é justo", efeito:{reputacao:0,estresse:-1}, manchete:"{nome} avalia o empate como justo"},
+    {t:"Admitir que faltou ousadia", efeito:{reputacao:+2,estresse:+2}, rel:{treinador:+1}, manchete:"{nome} admite falta de ousadia"},
+    {t:"Culpar o árbitro", efeito:{reputacao:-2,estresse:-1}, rel:{treinador:-2}, manchete:"{nome} reclama da arbitragem"},
+    {t:"Pedir calma à torcida", efeito:{felicidade:+1,reputacao:+1}, manchete:"{nome} pede paciência aos torcedores"},
+  ],
+  D: [
+    {t:"Assumir a responsabilidade", efeito:{reputacao:+2,estresse:+3}, manchete:"{nome} assume a derrota de cabeça erguida"},
+    {t:"Culpar o árbitro", efeito:{reputacao:-3,estresse:-1}, rel:{treinador:-2}, manchete:"{nome} culpa a arbitragem pela derrota"},
+    {t:"Pedir paciência", efeito:{estresse:-1}, manchete:"{nome} pede paciência ao torcedor"},
+    {t:"Desconversar", efeito:{reputacao:-2,felicidade:-1}, manchete:"{nome} foge de perguntas após a derrota"},
+  ],
+};
+const RESP_PESSOAL_ENTREVISTA = {t:"Falar sobre a vida pessoal", efeito:{felicidade:-1,reputacao:+1}, rel:{familia:+1}, manchete:"{nome} fala de equilíbrio entre amor e carreira"};
+function aplicarRel(r){
+  if(!r) return;
+  if(r.treinador) P.rel.treinador = clamp(P.rel.treinador + r.treinador, 0, 100);
+  if(r.amigos) P.rel.amigos = clamp(P.rel.amigos + r.amigos, 0, 100);
+  if(r.familia) P.rel.familia = clamp(P.rel.familia + r.familia, 0, 100);
+}
+function pushNoticia(t){
+  P.noticias = P.noticias || [];
+  P.noticias.unshift({t, dia:P.diaAbs, semana:P.semana, ano:P.ano});
+  if(P.noticias.length>60) P.noticias.pop();
+}
+function eventoEntrevista(res, nota){
+  const veiculo = pick(VEICULOS_ENTREVISTA);
+  const pergunta = pick(PERG_ENTREVISTA[res]);
+  const primeiro = P.perfil.nome.split(" ")[0];
+  let opcoes = shuffle(RESP_ENTREVISTA[res]).slice(0,3);
+  if(P.par) opcoes.push(RESP_PESSOAL_ENTREVISTA);
+  return {
+    id:"entrevista_"+P.diaAbs, titulo:`Entrevista para ${veiculo}`,
+    texto:`Pergunta do repórter: "${pergunta}" Sua nota foi ${nota}.`,
+    opcoes: opcoes.map(r=>({
+      t:r.t, efeito:r.efeito,
+      fx:()=>{ aplicarRel(r.rel); pushNoticia(r.manchete.replace("{nome}", primeiro)); },
+      log:`Entrevista (${veiculo}): ${r.t.toLowerCase()}.`,
+    })),
+  };
+}
+
+/* ===== Compras: à vista, financiamento, consumo e investimentos ===== */
+const CONSUMO = [
+  {id:"roupas", nome:"Roupas de marca", cat:"Estilo", preco:900, bonus:{felicidade:+2,reputacao:+1}},
+  {id:"celular", nome:"Celular topo de linha", cat:"Tecnologia", preco:5000, bonus:{felicidade:+3}},
+  {id:"console", nome:"Console de videogame", cat:"Tecnologia", preco:3500, bonus:{felicidade:+4,estresse:-3}},
+  {id:"viagem", nome:"Viagem à praia", cat:"Lazer", preco:4500, bonus:{felicidade:+8,estresse:-6,forma:+2}},
+  {id:"jantar", nome:"Jantar com amigos", cat:"Lazer", preco:350, bonus:{rel_amigos:+4,felicidade:+2}},
+  {id:"presente_familia", nome:"Presente para a família", cat:"Família", preco:700, bonus:{rel_familia:+5}},
+  {id:"curso_ingles", nome:"Curso de inglês", cat:"Estudo", preco:1800, bonus:{estudo:+5}},
+  {id:"equip_treino", nome:"Equipamento de treino", cat:"Saúde", preco:2200, bonus:{forma:+4}},
+  {id:"flores", nome:"Flores e chocolate", cat:"Relacionamento", preco:250, bonus:{felicidade:+2}, requerPar:true},
+];
+function comprar(tipo, id, forma){
+  if(tipo==="consumo"){
+    const it = CONSUMO.find(x=>x.id===id);
+    if(!it || P.vida.dinheiro < it.preco) return;
+    P.vida.dinheiro -= it.preco; aplicar(it.bonus);
+    if(it.requerPar && P.par) P.par.afinidade = clamp(P.par.afinidade+6,0,100);
+    log(`Comprou: ${it.nome}`, "compra"); salvar(); render(); return;
+  }
+  const lista = tipo==="veiculo" ? DADOS.veiculos : DADOS.casas;
+  const item = lista.find(x=>x.id===id); if(!item) return;
+  if(tipo==="veiculo" ? P.vida.veiculos.includes(id) : P.vida.casa===id) return;
+  const parcelado = forma==="parcelado";
+  const semanas = tipo==="casa" ? 104 : 52;
+  const entrada = parcelado ? Math.round(item.preco*0.1) : item.preco;
+  if(P.vida.dinheiro < entrada){ alert("Dinheiro insuficiente para a entrada."); return; }
+  P.vida.dinheiro -= entrada;
+  P.vida.dividas = P.vida.dividas || [];
+  if(parcelado){
+    const total = Math.round((item.preco-entrada)*1.25);
+    P.vida.dividas.push({id, tipo, nome:item.nome, parcela:Math.ceil(total/semanas), restantes:semanas});
+  }
+  if(tipo==="veiculo") P.vida.veiculos.push(id); else P.vida.casa = id;
+  aplicar(item.bonus);
+  log(`${parcelado?"Financiou":"Comprou"}: ${item.nome}`, "compra");
+  salvar(); render();
+}
+function investir(tipo, valor){
+  if(P.vida.dinheiro < valor) return;
+  P.vida.dinheiro -= valor;
+  P.vida.investimentos[tipo] = (P.vida.investimentos[tipo]||0) + valor;
+  log(`Aplicou R$ ${valor.toLocaleString("pt-BR")} em ${tipo==="rf"?"renda fixa":"ações"}.`, "compra");
+  salvar(); render();
+}
+function resgatar(tipo){
+  const v = Math.round(P.vida.investimentos[tipo]||0); if(!v) return;
+  P.vida.dinheiro += v; P.vida.investimentos[tipo] = 0;
+  log(`Resgatou R$ ${v.toLocaleString("pt-BR")} de ${tipo==="rf"?"renda fixa":"ações"}.`, "compra");
+  salvar(); render();
+}
+function rendimentoSemanal(){
+  const inv = P.vida.investimentos; if(!inv) return;
+  inv.rf = Math.round((inv.rf||0)*1.006);
+  if(inv.acoes>0){
+    const variacao = Math.random()*0.20 - 0.08;
+    inv.acoes = Math.max(0, Math.round(inv.acoes*(1+variacao)));
+    if(variacao < -0.05) log("O mercado caiu e suas ações perderam valor.", "compra");
+    else if(variacao > 0.08) log("Suas ações subiram bem essa semana.", "compra");
+  }
+}
+function cobrarDividas(){
+  for(const dv of P.vida.dividas||[]){ P.vida.dinheiro -= dv.parcela; dv.restantes--; }
+  P.vida.dividas = (P.vida.dividas||[]).filter(dv=>dv.restantes>0);
+  if(P.vida.dinheiro < 0){
+    P.mente.estresse = clamp(P.mente.estresse+4,0,100);
+    P.mente.felicidade = clamp(P.mente.felicidade-2,0,100);
+    if(Math.random()<0.3) log("Você está no vermelho. As contas apertam.", "evento");
+  }
+}
+function telaCompras(){
+  const dinheiro = P.vida.dinheiro;
+  const inv = P.vida.investimentos || {rf:0,acoes:0};
+  const dividas = P.vida.dividas || [];
+  const semanal = dividas.reduce((s,d)=>s+d.parcela,0);
+  const linhaVeiculo = v => {
+    const tem = P.vida.veiculos.includes(v.id);
+    const entrada = Math.round(v.preco*0.1);
+    return `<div class="row"><span><b>${v.nome}</b><small class="mut" style="display:block">R$ ${v.preco.toLocaleString("pt-BR")} · manutenção R$ ${v.manut}/mês</small></span>
+      <span class="btns">
+        <button class="b" ${tem||dinheiro<v.preco?"disabled":""} onclick="comprar('veiculo','${v.id}','vista')">À vista</button>
+        <button class="b" ${tem||dinheiro<entrada?"disabled":""} onclick="comprar('veiculo','${v.id}','parcelado')">Financiar 52 sem.<small>entrada R$ ${entrada.toLocaleString("pt-BR")}</small></button>
+      </span></div>`;
+  };
+  const linhaCasa = c => {
+    const tem = P.vida.casa===c.id;
+    const entrada = Math.round(c.preco*0.1);
+    return `<div class="row"><span><b>${c.nome}</b><small class="mut" style="display:block">R$ ${c.preco.toLocaleString("pt-BR")}</small></span>
+      <span class="btns">
+        <button class="b" ${tem||dinheiro<c.preco?"disabled":""} onclick="comprar('casa','${c.id}','vista')">À vista</button>
+        <button class="b" ${tem||dinheiro<entrada?"disabled":""} onclick="comprar('casa','${c.id}','parcelado')">Financiar 104 sem.<small>entrada R$ ${entrada.toLocaleString("pt-BR")}</small></button>
+      </span></div>`;
+  };
+  const cats = [...new Set(CONSUMO.map(c=>c.cat))];
+  return `
+    <section class="hero"><div class="hero-txt">
+      <div class="sec-num">Compras</div>
+      <h2>Seu dinheiro, suas escolhas</h2>
+      <p class="mut">Saldo: <b>R$ ${dinheiro.toLocaleString("pt-BR")}</b> ${semanal?`· parcelas: R$ ${semanal.toLocaleString("pt-BR")}/semana`:""}</p>
+    </div></section>
+    <div class="card"><h3>01 · Veículos</h3>${DADOS.veiculos.map(linhaVeiculo).join("")}</div>
+    <div class="card"><h3>02 · Moradia</h3>${DADOS.casas.map(linhaCasa).join("")}</div>
+    ${cats.map(cat=>`
+      <div class="card"><h3>${cat}</h3>
+        <div class="btns">${CONSUMO.filter(c=>c.cat===cat).map(c=>{
+          const sem = c.requerPar && !P.par;
+          return `<button class="b" ${dinheiro<c.preco||sem?"disabled":""} onclick="comprar('consumo','${c.id}')">${c.nome}<small>R$ ${c.preco.toLocaleString("pt-BR")}${sem?" · precisa de alguém":""}</small></button>`;
+        }).join("")}</div>
+      </div>`).join("")}
+    <div class="card"><h3>03 · Investimentos</h3>
+      <div class="row"><span><b>Renda fixa</b><small class="mut" style="display:block">Rende cerca de 0,6% por semana</small></span><span><b>R$ ${Math.round(inv.rf||0).toLocaleString("pt-BR")}</b></span></div>
+      <div class="btns" style="margin:8px 0 14px">
+        <button class="b" ${dinheiro<5000?"disabled":""} onclick="investir('rf',5000)">Aplicar R$ 5.000<small>renda fixa</small></button>
+        <button class="b" ${!inv.rf?"disabled":""} onclick="resgatar('rf')">Resgatar tudo</button>
+      </div>
+      <div class="row"><span><b>Ações</b><small class="mut" style="display:block">Pode subir ou cair muito a cada semana</small></span><span><b>R$ ${Math.round(inv.acoes||0).toLocaleString("pt-BR")}</b></span></div>
+      <div class="btns" style="margin-top:8px">
+        <button class="b" ${dinheiro<5000?"disabled":""} onclick="investir('acoes',5000)">Aplicar R$ 5.000<small>ações</small></button>
+        <button class="b" ${!inv.acoes?"disabled":""} onclick="resgatar('acoes')">Resgatar tudo</button>
+      </div>
+    </div>
+    <div class="card"><h3>04 · Dívidas</h3>
+      ${dividas.length ? dividas.map(d=>`<div class="row"><span><b>${d.nome}</b><small class="mut" style="display:block">${d.restantes} semanas restantes</small></span><span class="mut">R$ ${d.parcela.toLocaleString("pt-BR")}/sem.</span></div>`).join("") : `<p class="mut">Nenhuma dívida no momento.</p>`}
+    </div>`;
+}
+
+/* ===== Vida pessoal: relacionamento, família, hobbies e cabeça ===== */
+const NOMES_PAR = ["Júlia","Camila","Rafaela","Lívia","Mariana","Bianca","Larissa","Carol"];
+const HOBBIES = [
+  {id:"musica", nome:"Tocar violão", desc:"Melhora o humor e o foco", frases:["Você passou a tarde tentando acertar um acorde novo.","Uma música antiga voltou e você tocou até tarde.","Você tocou para o pessoal da família e arrancou aplausos."]},
+  {id:"leitura", nome:"Ler livros", desc:"Calma e visão de jogo", frases:["Um capítulo de biografia de atleta te deixou pensando.","Você leu até o sol nascer e dormiu cansado, mas feliz.","Um livro sobre estratégia te deu uma ideia para o treino."]},
+  {id:"arte", nome:"Desenhar", desc:"Paciência e concentração", frases:["Você esboçou o rosto de um amigo sem olhar para o papel.","Um desenho novo ficou pronto, e você gostou do resultado.","Passou a noite pintando e esqueceu do celular."]},
+  {id:"codigo", nome:"Programar", desc:"Lógica e disciplina", frases:["Você passou horas corrigindo um bug e finalmente funcionou.","Um projeto pequeno ficou pronto e você ficou orgulhoso.","Você aprendeu uma técnica nova lendo documentação."]},
+  {id:"cozinha", nome:"Cozinhar", desc:"Alimentação e convivência", frases:["Você fez um prato novo e os amigos elogiaram.","Um almoço caseiro com a família virou festa.","A receita deu errado, mas a risada foi boa."]},
+];
+function nivelHobby(id){ return Math.min(5, Math.floor(((P.hobbies||{})[id]||0)/3)); }
+function praticarHobby(id){
+  if(P.diaAtividade === P.diaAbs) return;
+  const h = HOBBIES.find(x=>x.id===id); if(!h) return;
+  P.hobbies = P.hobbies || {};
+  P.hobbies[id] = (P.hobbies[id]||0) + 1;
+  aplicar({felicidade:+2, estresse:-2});
+  P.diaAtividade = P.diaAbs;
+  log(pick(h.frases), "pessoal");
+  salvar(); render();
+}
+function acaoPessoal(id){
+  if(P.pessoalSemana === chaveSemana()) return;
+  const r = Math.random(); let msg = "";
+  switch(id){
+    case "conhecer":
+      if(P.par) return;
+      if(r < 0.6){ P.par = {nome:pick(NOMES_PAR), afinidade:30, status:"conhecendo"}; aplicar({felicidade:+3}); msg = `Você conheceu ${P.par.nome}. A conversa rendeu.`; }
+      else msg = "Você saiu, mas ninguém te chamou a atenção.";
+      break;
+    case "encontro":
+      if(!P.par) return;
+      P.vida.dinheiro -= 200;
+      P.par.afinidade = clamp(P.par.afinidade + 6 + (r<0.5?3:0), 0, 100);
+      aplicar({felicidade:+3});
+      msg = `Encontro com ${P.par.nome}: jantar e papo longo.`; break;
+    case "presente":
+      if(!P.par) return;
+      P.vida.dinheiro -= 300; P.par.afinidade = clamp(P.par.afinidade+4,0,100);
+      msg = `Você deu um presente para ${P.par.nome}.`; break;
+    case "pedir":
+      if(!P.par || P.par.status!=="conhecendo") return;
+      if(P.par.afinidade >= 50){ P.par.status = "namoro"; aplicar({felicidade:+6}); msg = `Você pediu ${P.par.nome} em namoro, e ela aceitou.`; }
+      else { P.par.afinidade = clamp(P.par.afinidade-8,0,100); msg = `${P.par.nome} quis esperar mais um pouco.`; }
+      break;
+    case "terminar":
+      if(!P.par) return;
+      msg = `Você terminou com ${P.par.nome}.`; aplicar({felicidade:-8,estresse:+6}); P.par = null; break;
+    case "familia_ligar":
+      aplicar({rel_familia:+2}); msg = "Você ligou para a família e conversou um bom tempo."; break;
+    case "familia_visita":
+      P.vida.dinheiro -= 300; aplicar({rel_familia:+5,felicidade:+3}); msg = "Você passou o fim de semana com a família."; break;
+    case "psicologo":
+      P.vida.dinheiro -= 250; aplicar({estresse:-10,felicidade:+3}); msg = "Você cuidou da cabeça numa sessão de terapia."; break;
+    default: return;
+  }
+  P.pessoalSemana = chaveSemana();
+  log(msg, "pessoal");
+  salvar(); render();
+}
+function semanaPessoal(){
+  if(P.par && P.par.status==="namoro"){
+    P.par.afinidade = clamp(P.par.afinidade + (Math.random()<0.5?1:-2), 0, 100);
+    aplicar({felicidade:+1});
+    if(P.par.afinidade <= 15){ log(`Vocês se afastaram e terminaram com ${P.par.nome}.`, "pessoal"); aplicar({felicidade:-6}); P.par = null; }
+  }
+  for(const h of HOBBIES){ if(nivelHobby(h.id)>=3) P.mente.felicidade = clamp(P.mente.felicidade+1,0,100); }
+}
+function telaPessoal(){
+  const ja = P.pessoalSemana === chaveSemana();
+  const par = P.par;
+  const btn = (id, nome, desc, ativo) => `<button class="b" ${ja||!ativo?"disabled":""} onclick="acaoPessoal('${id}')">${nome}<small>${desc}</small></button>`;
+  return `
+    <section class="hero"><div class="hero-txt">
+      <div class="sec-num">Vida pessoal</div>
+      <h2>Além do campo</h2>
+      <p class="mut">Um compromisso pessoal por semana. Hobbies podem ser praticados todo dia.</p>
+    </div></section>
+    <div class="card"><h3>01 · Relacionamento</h3>
+      ${par ? `<p><b>${par.nome}</b> · ${par.status==="namoro"?"namorando":"conhecendo"}</p>${statBox("Afinidade", par.afinidade)}` : `<p class="mut">Você está solteiro.</p>`}
+      <div class="btns" style="margin-top:12px">
+        ${btn("conhecer","Conhecer alguém","Chance de conhecer uma pessoa nova",!par)}
+        ${btn("encontro","Sair para um encontro","R$ 200 · afinidade sobe",!!par)}
+        ${btn("presente","Dar um presente","R$ 300 · afinidade +4",!!par)}
+        ${btn("pedir","Pedir em namoro","Precisa de afinidade 50+",!!par && par.status==="conhecendo")}
+        ${btn("terminar","Terminar","Dói, mas acontece",!!par)}
+      </div></div>
+    <div class="card"><h3>02 · Família e cabeça</h3>
+      <div class="btns">
+        ${btn("familia_ligar","Ligar para a família","Sem custo · relação +2",true)}
+        ${btn("familia_visita","Visitar a família","R$ 300 · relação +5, felicidade +3",true)}
+        ${btn("psicologo","Sessão de psicólogo","R$ 250 · estresse −10",true)}
+      </div></div>
+    <div class="card"><h3>03 · Hobbies</h3>
+      ${HOBBIES.map(h=>`<div class="row"><span><b>${h.nome}</b><small class="mut" style="display:block">${h.desc}</small></span>
+        <span><button class="b" ${P.diaAtividade===P.diaAbs?"disabled":""} onclick="praticarHobby('${h.id}')">Praticar<small>nível ${nivelHobby(h.id)}</small></button></span></div>`).join("")}
+    </div>`;
+}
 
 /* ===== The Fenômeno: nota OVR, níveis, ranking e modo rápido ===== */
 function ovr(){
@@ -2207,6 +2465,7 @@ if(P){
   P.cartoes = P.cartoes || 0; P.suspenso = !!P.suspenso;
   P.resultados = P.resultados || {};
   P.filaEventos = P.filaEventos || [];
+  P.vida.dividas = P.vida.dividas || []; P.vida.investimentos = P.vida.investimentos || {rf:0,acoes:0}; P.hobbies = P.hobbies || {}; P.pessoalSemana = P.pessoalSemana || null;
   P.modo = P.modo || "completo"; P.nivel = P.nivel || "amador"; P.stats.bolas = P.stats.bolas || 0; P.golsTemp = P.golsTemp || 0;
 }
 render();
