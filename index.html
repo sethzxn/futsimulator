@@ -86,6 +86,12 @@
   .log p{margin:8px 0;padding-left:12px;border-left:3px solid var(--line2)}
   .story{white-space:pre-wrap;line-height:1.65;color:var(--ink)}
 
+  button.b.sel{border-color:var(--gold);box-shadow:0 0 0 2px var(--gold-bg);background:var(--gold-bg)}
+  .ch{color:var(--blue)!important;margin-top:2px}
+  .tbl{width:100%;border-collapse:collapse;font-size:14px}
+  .tbl th,.tbl td{padding:9px 8px;border-bottom:1px solid var(--line);text-align:left}
+  .tbl th{font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--mut)}
+  .tbl tr.me td{background:var(--gold-bg);font-weight:700}
   @media (max-width:560px){
     .hero{flex-direction:column;text-align:center}
     .hero h2{font-size:28px}
@@ -135,16 +141,6 @@ const DADOS = {
   },
 };
 
-const TREINOS = [
-  { id:"fisico", nome:"Treino físico", desc:"Resistência e velocidade", ganha:["resistencia","velocidade"], custo:{forma:-6,estresse:+5} },
-  { id:"finalizacao", nome:"Treino de finalização", desc:"Chutes e posicionamento", ganha:["finalizacao"], custo:{forma:-4,estresse:+3} },
-  { id:"passe", nome:"Treino de passe", desc:"Passe e visão de jogo", ganha:["passe","visao"], custo:{forma:-3,estresse:+3} },
-  { id:"drible", nome:"Treino de drible", desc:"Controle e condução", ganha:["drible"], custo:{forma:-4,estresse:+4} },
-  { id:"defesa", nome:"Treino defensivo", desc:"Marcação e posicionamento", ganha:["defesa"], custo:{forma:-4,estresse:+3} },
-  { id:"academia", nome:"Academia", desc:"Musculação e preparo", ganha:["resistencia"], custo:{forma:-5,estresse:+4}, extra:{saude:+1} },
-  { id:"estudo", nome:"Estudar", desc:"Disciplina e futuro fora do campo", ganha:[], custo:{forma:-1,estresse:+4}, extra:{disciplina:+2,estudo:+3} },
-];
-
 const ATIVIDADES = [
   { id:"descanso", nome:"Descansar", desc:"Recupera forma, reduz estresse", efeito:{forma:+8,estresse:-8} },
   { id:"familia", nome:"Tempo com a família", desc:"Melhora relação com a família", efeito:{felicidade:+4,estresse:-3,rel_familia:+4} },
@@ -154,55 +150,126 @@ const ATIVIDADES = [
 ];
 
 const EVENTOS = [
-  { id:"proposta", peso:3, cond:s=>s.semana>=10,
-    titulo:"Proposta de outro clube",
-    texto:"Um clube de divisão maior quer você. A proposta exige mudar de cidade.",
+  { id:"patrocinio", peso:2, cond:s=>s.semana>=8,
+    titulo:"Patrocínio local", texto:"Uma loja da cidade quer estampar seu nome na camisa de treino.",
     opcoes:[
-      { t:"Aceitar a proposta", efeito:{reputacao:+6,felicidade:-6,dinheiro:+3000,rel_familia:-3}, log:"Você se mudou e começou em um clube maior.", mudaClube:1 },
-      { t:"Recusar e continuar", efeito:{felicidade:+3,disciplina:+1}, log:"Você ficou onde estava e manteve a rotina." },
-    ]},
-  { id:"festa_vizinho", peso:2, cond:s=>s.semana>=4,
-    titulo:"Convite para uma festa",
-    texto:"Uma festa na véspera do jogo decisivo. Um colega comenta que vai ter fotos.",
+      {t:"Aceitar o contrato", efeito:{dinheiro:+1500,reputacao:+2}, log:"Você fechou o patrocínio local."},
+      {t:"Recusar e manter o foco", efeito:{felicidade:+2,disciplina:+1}, log:"Você preferiu não se comprometer ainda."} ]},
+  { id:"festa_colega", peso:2, cond:s=>s.semana>=3,
+    titulo:"Festa do colega", texto:"Um colega de time chama todo mundo para a casa dele no fim de semana.",
     opcoes:[
-      { t:"Ir e curtir", efeito:{felicidade:+8,forma:-10,reputacao:+2}, log:"A noite foi boa, mas o corpo sentiu.", chance:{p:0.3,flag:"foto_viral"} },
-      { t:"Recusar e treinar", efeito:{forma:+4,estresse:+2,disciplina:+1}, log:"Você ficou em casa e treinou." },
-    ]},
-  { id:"lesao", peso:1, cond:s=>s.corpo.forma<50,
-    titulo:"Dor no joelho",
-    texto:"Depois de treinos puxados, o joelho começa a incomodar.",
+      {t:"Ir e curtir", efeito:{felicidade:+8,forma:-6,reputacao:+1}, log:"A festa foi boa.", chance:{p:0.25,flag:"foto_viral"}},
+      {t:"Recusar e descansar", efeito:{forma:+4,estresse:+2,disciplina:+1}, log:"Você ficou em casa e descansou."} ]},
+  { id:"lesao_joelho", peso:1, cond:s=>s.corpo.forma<45,
+    titulo:"Dor no joelho", texto:"Depois de treinos puxados, o joelho começa a incomodar.",
     opcoes:[
-      { t:"Procurar um médico", efeito:{saude:+5,dinheiro:-800}, log:"O médico pediu repouso e acompanhamento." },
-      { t:"Ignorar e continuar", efeito:{saude:-10,forma:-5}, log:"A dor piorou um pouco.", flag:"lesao_risco" },
-    ]},
-  { id:"familia_briga", peso:2, cond:s=>s.idade>=15,
-    titulo:"Briga em casa",
-    texto:"Seu pai ou sua mãe quer que você largue o futebol e estude. A discussão esquentou.",
+      {t:"Procurar um médico", efeito:{saude:+6,dinheiro:-600}, log:"O médico pediu repouso e acompanhamento."},
+      {t:"Ignorar e continuar", efeito:{saude:-8,forma:-4}, log:"A dor piorou um pouco.", flag:"lesao_risco"} ]},
+  { id:"briga_familia", peso:2, cond:s=>s.idade>=15,
+    titulo:"Briga em casa", texto:"Seu pai ou sua mãe acha que você deveria estudar mais. A discussão esquentou.",
     opcoes:[
-      { t:"Ceder e estudar", efeito:{disciplina:+3,rel_familia:+3,felicidade:-4}, log:"Você aceitou e passou a estudar mais." },
-      { t:"Insistir no futebol", efeito:{felicidade:+2,rel_familia:-6,estresse:+5}, log:"A família ficou chateada, mas você seguiu." },
-    ]},
-  { id:"bonus", peso:2, cond:s=>s.stats.gols>=2,
-    titulo:"Prêmio de gol",
-    texto:"Um patrocinador quer dar um prêmio por seus gols recentes.",
+      {t:"Ceder e estudar mais", efeito:{disciplina:+3,rel_familia:+3,felicidade:-3,estudo:+3}, log:"Você aceitou dividir o tempo com os estudos."},
+      {t:"Insistir no futebol", efeito:{felicidade:+2,rel_familia:-6,estresse:+5}, log:"A família ficou chateada, mas você seguiu."} ]},
+  { id:"aposta", peso:1, cond:s=>s.semana>=6 && s.vida.dinheiro>500,
+    titulo:"Aposta entre amigos", texto:"Os amigos querem apostar no próximo jogo. Quem perder paga a conta.",
     opcoes:[
-      { t:"Aceitar o dinheiro", efeito:{dinheiro:+2500,reputacao:+2}, log:"Você recebeu o prêmio." },
-      { t:"Pedir um contrato de imagem", efeito:{reputacao:+5,dinheiro:+500}, log:"Você fechou um contrato de imagem.", flag:"contrato_imagem" },
-    ]},
-  { id:"viral", peso:1, cond:s=>s.flags.foto_viral && !s.flags.viral_ok,
-    titulo:"Foto viralizou",
-    texto:"Uma foto sua da festa está circulando nas redes. Você precisa responder.",
+      {t:"Apostar", efeito:{felicidade:+4,dinheiro:+0}, log:"Você apostou. Sorte ou azar?", sorte:{p:0.5,ganho:800,perda:-800}},
+      {t:"Recusar", efeito:{disciplina:+1}, log:"Você ficou fora da aposta."} ]},
+  { id:"carro_quebrou", peso:2, cond:s=>s.vida.veiculos.length>0,
+    titulo:"O carro quebrou", texto:"O carro parou no meio da rua e o mecânico diz que o conserto é caro.",
     opcoes:[
-      { t:"Pedir desculpas", efeito:{reputacao:-4,felicidade:-3}, log:"Você se desculpou e o assunto passou.", flag:"viral_ok" },
-      { t:"Ignorar", efeito:{reputacao:-8,estresse:+8}, log:"O assunto cresceu nas redes.", flag:"viral_ok" },
-    ]},
+      {t:"Pagar o conserto", efeito:{dinheiro:-900,estresse:-2}, log:"O carro voltou a funcionar."},
+      {t:"Vender peças usadas", efeito:{dinheiro:+300,estresse:+4}, log:"Você vendeu algumas peças e o carro ficou parado."} ]},
+  { id:"convite_selecao", peso:1, cond:s=>s.idade>=15 && s.mente.reputacao>=20,
+    titulo:"Seleção de base", texto:"A seleção de base convocou você para uma seleção de treinos.",
+    opcoes:[
+      {t:"Aceitar a convocação", efeito:{reputacao:+8,forma:-5,estresse:+5}, log:"Você foi aos treinos da seleção de base."},
+      {t:"Recusar por causa do clube", efeito:{felicidade:+3,reputacao:-2}, log:"Você preferiu continuar no clube."} ]},
   { id:"amigo_pede", peso:2, cond:s=>s.semana>=8,
-    titulo:"Amigo pede dinheiro",
-    texto:"Um amigo de infância precisa de ajuda com uma dívida.",
+    titulo:"Amigo pede dinheiro", texto:"Um amigo de infância precisa de ajuda com uma dívida.",
     opcoes:[
-      { t:"Emprestar", efeito:{dinheiro:-1500,rel_amigos:+6}, log:"Você emprestou, e o amigo agradeceu." },
-      { t:"Recusar", efeito:{rel_amigos:-6,estresse:+2}, log:"Ele ficou chateado." },
-    ]},
+      {t:"Emprestar", efeito:{dinheiro:-1500,rel_amigos:+6}, log:"Você emprestou, e o amigo agradeceu."},
+      {t:"Recusar", efeito:{rel_amigos:-6,estresse:+2}, log:"Ele ficou chateado."} ]},
+  { id:"professor", peso:2, cond:s=>s.idade>=14 && s.estudo<20,
+    titulo:"Professor pede ajuda", texto:"Seu professor quer que você faça um trabalho extra, senão pode perder a média.",
+    opcoes:[
+      {t:"Fazer o trabalho", efeito:{estudo:+4,disciplina:+1,estresse:+3}, log:"Você fez o trabalho a tempo."},
+      {t:"Deixar para depois", efeito:{estresse:+1,disciplina:-1}, log:"O trabalho ficou para depois."} ]},
+  { id:"paquera", peso:2, cond:s=>s.idade>=16,
+    titulo:"Convite inesperado", texto:"Alguém da escola te chama para sair no sábado à noite.",
+    opcoes:[
+      {t:"Aceitar o convite", efeito:{felicidade:+8,estresse:-3}, log:"Foi um encontro agradável."},
+      {t:"Recusar por causa do jogo", efeito:{estresse:+2,disciplina:+1}, log:"Você preferiu focar no futebol."} ]},
+  { id:"entrevista", peso:1, cond:s=>s.mente.reputacao>=25,
+    titulo:"Entrevista na TV local", texto:"Um canal de esportes quer uma entrevista com você.",
+    opcoes:[
+      {t:"Falar com humildade", efeito:{reputacao:+4,felicidade:+2}, log:"A entrevista foi bem recebida."},
+      {t:"Falar de forma polêmica", efeito:{reputacao:+8,felicidade:-2}, log:"Repercutiu bem... e mal.", chance:{p:0.4,flag:"polemica"}} ]},
+  { id:"polemica", peso:1, cond:s=>s.flags.polemica && !s.flags.polemica_ok,
+    titulo:"Polêmica nas redes", texto:"Trechos da sua entrevista viralizaram e estão gerando discussão.",
+    opcoes:[
+      {t:"Pedir desculpas", efeito:{reputacao:-3,felicidade:-2}, log:"Você pediu desculpas e o assunto diminuiu.", flag:"polemica_ok"},
+      {t:"Ignorar", efeito:{reputacao:-8,estresse:+6}, log:"O assunto cresceu.", flag:"polemica_ok"} ]},
+  { id:"avo_doente", peso:1, cond:s=>s.idade>=17,
+    titulo:"Notícia de saúde na família", texto:"Seu avô foi internado. Ele pergunta por você.",
+    opcoes:[
+      {t:"Visitar o avô", efeito:{rel_familia:+8,forma:-3,felicidade:-4}, log:"Você passou o dia com ele."},
+      {t:"Ligar e prometer voltar", efeito:{rel_familia:+3,estresse:+2}, log:"A ligação foi curta, mas ele ficou feliz."} ]},
+  { id:"ajuda_familia", peso:1, cond:s=>s.vida.dinheiro<200,
+    titulo:"A família precisa de ajuda", texto:"As contas do mês apertaram em casa.",
+    opcoes:[
+      {t:"Ajudar com o que tiver", efeito:{dinheiro:-400,rel_familia:+6}, log:"Você ajudou a família com as contas."},
+      {t:"Não é sua responsabilidade agora", efeito:{rel_familia:-5,estresse:+3}, log:"A família entendeu, mas ficou magoada."} ]},
+  { id:"treinador_conversa", peso:2, cond:s=>s.semana>=5,
+    titulo:"O treinador quer conversar", texto:"Ele te chama para uma conversa particular depois do treino.",
+    opcoes:[
+      {t:"Ouvir e aceitar as críticas", efeito:{disciplina:+3,felicidade:-2}, log:"Você ouviu com atenção e saiu com um plano."},
+      {t:"Questionar as decisões dele", efeito:{estresse:+4,reputacao:+2}, log:"A conversa esquentou, mas você foi respeitado."} ]},
+  { id:"companheiro_lesionado", peso:1, cond:s=>s.semana>=10,
+    titulo:"Companheiro lesionado", texto:"Um colega sofreu uma lesão séria e está abatido.",
+    opcoes:[
+      {t:"Visitar e apoiar", efeito:{rel_amigos:+5,estresse:+2}, log:"Você visitou o colega no hospital."},
+      {t:"Seguir a rotina", efeito:{rel_amigos:-4}, log:"Ele percebeu que você não apareceu."} ]},
+  { id:"viagem_familia", peso:1, cond:s=>s.vida.dinheiro>2000,
+    titulo:"Viagem em família", texto:"A família propõe uma viagem curta na próxima folga.",
+    opcoes:[
+      {t:"Ir com a família", efeito:{felicidade:+10,dinheiro:-1500,rel_familia:+6}, log:"A viagem foi uma das melhores lembranças do ano."},
+      {t:"Ficar para treinar", efeito:{rel_familia:-3,forma:+3}, log:"Você ficou treinando."} ]},
+  { id:"aluguel", peso:1, cond:s=>!s.vida.casa,
+    titulo:"Aluguel reajustado", texto:"O proprietário anunciou um reajuste no aluguel.",
+    opcoes:[
+      {t:"Pagar o novo valor", efeito:{dinheiro:-300}, log:"Você pagou o reajuste sem reclamar."},
+      {t:"Negociar", efeito:{estresse:+3,dinheiro:-100}, log:"Você negociou um valor um pouco menor."} ]},
+  { id:"curso_tatica", peso:1, cond:s=>s.estudo>=10,
+    titulo:"Curso online de tática", texto:"Um curso sobre leitura de jogo abriu inscrições.",
+    opcoes:[
+      {t:"Fazer o curso", efeito:{estudo:+5,disciplina:+1,dinheiro:-200,visao:0}, log:"Você concluiu o curso e entendeu melhor o jogo.", bonusVisao:true},
+      {t:"Pular o curso", efeito:{felicidade:+2}, log:"Você deixou para outra hora."} ]},
+  { id:"olheiro", peso:1, cond:s=>s.semana>=12 && (s.at.drible>=50 || s.at.finalizacao>=50),
+    titulo:"Olheiro de outro clube", texto:"Um olheiro anotou seu nome e quer conversar.",
+    opcoes:[
+      {t:"Aceitar a conversa", efeito:{reputacao:+5,estresse:+2}, log:"A conversa foi positiva e ficou no radar."},
+      {t:"Ignorar", efeito:{felicidade:+1}, log:"Você preferiu focar no momento atual."} ]},
+  { id:"amizades", peso:1, cond:s=>s.rel.amigos<30,
+    titulo:"Amizades se afastando", texto:"Você percebeu que anda pouco com os amigos de sempre.",
+    opcoes:[
+      {t:"Reunir o grupo", efeito:{rel_amigos:+8,dinheiro:-150}, log:"O grupo se reuniu e a amizade voltou a crescer."},
+      {t:"Deixar como está", efeito:{rel_amigos:-3}, log:"Os encontros diminuíram ainda mais."} ]},
+  { id:"insonia", peso:1, cond:s=>s.mente.estresse>70,
+    titulo:"Noites mal dormidas", texto:"Você não consegue dormir direito há dias.",
+    opcoes:[
+      {t:"Procurar ajuda", efeito:{estresse:-12,dinheiro:-200}, log:"Você procurou ajuda e começou a melhorar."},
+      {t:"Ignorar", efeito:{saude:-5,forma:-4}, log:"O cansaço se acumulou."} ]},
+  { id:"destaque", peso:1, cond:s=>s.stats.notas.length>=3 && s.stats.notas.slice(-3).reduce((a,b)=>a+b,0)/3>=7,
+    titulo:"Destaque do mês", texto:"Você foi escolhido o destaque do mês pela imprensa.",
+    opcoes:[
+      {t:"Aceitar o prêmio", efeito:{dinheiro:+1000,reputacao:+6}, log:"Você recebeu o prêmio com humildade."},
+      {t:"Recusar a homenagem", efeito:{reputacao:+2,felicidade:+1}, log:"Você preferiu não aparecer."} ]},
+  { id:"foto_viral", peso:0, cond:s=>s.flags.foto_viral && !s.flags.viral_ok,
+    titulo:"Foto da festa viralizou", texto:"Uma foto sua na festa está circulando nas redes.",
+    opcoes:[
+      {t:"Pedir desculpas", efeito:{reputacao:-4,felicidade:-3}, log:"Você se desculpou e o assunto passou.", flag:"viral_ok"},
+      {t:"Ignorar", efeito:{reputacao:-8,estresse:+8}, log:"O assunto cresceu nas redes.", flag:"viral_ok"} ]},
 ];
 
 /* =========================================================
@@ -491,7 +558,7 @@ function voltarPasso(){ coletar(); if(C.passo>0){ C.passo--; render(); } }
 
 function criarPersonagem(){
   const origem = DADOS.origens[C.origem];
-  const clube = DADOS.clubes.find(c=>c.id===C.clubeBase) || DADOS.clubes[0];
+  const clubeEscolhido = DADOS.clubes.find(c=>c.id===C.clubeBase) || DADOS.clubes[0];
   const at = {}; ["finalizacao","passe","drible","defesa","velocidade","resistencia","visao"].forEach(k=>at[k]=r(28,48));
   P = {
     perfil: {
@@ -500,28 +567,31 @@ function criarPersonagem(){
       posicao: C.posicao, motivacao: C.motivacao, origem: C.origem,
       aparencia: C.aparencia, foto: C.foto, historia: C.historia,
     },
-    idade: IDADE_INI, semana:1, ano:2026,
+    idade: IDADE_INI, semana: 1, ano: 2026, dia: 1, diaAbs: 0, diaAtividade: null,
     at,
+    xp: Object.fromEntries(Object.keys(at).map(k=>[k,0])),
+    ultimoTreino: null, ultimoResultado: null,
     corpo: { saude:90, forma:65 },
     mente: { felicidade:60, estresse:20, disciplina:r(30,70), reputacao:10 },
     rel: { ...origem.rel },
     estudo: 0,
     vida: { dinheiro: origem.dinheiro, veiculos:[], casa:null, aluguel: origem.aluguel },
-    carreira: { clube: clube.nome, nivel: clube.nivel, salario: 800, titulos:0 },
+    carreira: { clube: clubeEscolhido.nome, nivel: clubeEscolhido.nivel, salario: 800, titulos: 0 },
     stats: { jogos:0, gols:0, assist:0, notas:[] },
-    flags: {},
-    historico: [],
-    tela: "inicio",
+    flags: {}, cooldown: {}, resultados: {},
+    eventoAtual: null, partida: null, jogoFeito: null, ultimoJogo: null,
+    historico: [], tela: "inicio",
   };
+  gerarTemporada();
   C = null;
-  log(`${P.perfil.nome} começa na base do ${clube.nome} aos 14 anos.`, "evento");
+  log(`${P.perfil.nome} começa na base do ${clubeEscolhido.nome} aos 14 anos.`, "evento");
   salvar(); render();
 }
 
 /* =========================================================
    ESTADO
    ========================================================= */
-const SAVE = "carreira-v3";
+const SAVE = "carreira-v4";
 const IDADE_INI = 14;
 const IDADE_MAX = 45;
 const r = (a,b)=>Math.floor(Math.random()*(b-a+1))+a;
@@ -552,43 +622,260 @@ function aplicar(e){
 }
 function log(txt, tipo){ P.historico.push({t:txt, tipo:tipo||"", s:P.semana, a:P.ano}); if(P.historico.length>250) P.historico.shift(); }
 
-/* ---------- Partidas ---------- */
-function partida(){
-  const a = P.at;
-  const pGol = clamp(10 + (a.finalizacao-50)*0.4 + P.corpo.forma*0.1 - P.mente.estresse*0.1, 3, 40)/100;
-  const pAss = clamp(14 + (a.passe-50)*0.4 + P.corpo.forma*0.1 - P.mente.estresse*0.1, 5, 45)/100;
-  const gol = Math.random()<pGol;
-  const ass = !gol && Math.random()<pAss;
-  const nota = clamp(5 + (gol?2:0) + (ass?1:0) + (Math.random()*2.4-1.2) + (P.corpo.forma-60)/60, 0, 10);
-  P.stats.jogos++; if(gol) P.stats.gols++; if(ass) P.stats.assist++;
-  P.stats.notas.push(Number(nota.toFixed(1)));
-  P.vida.dinheiro += Math.round(P.carreira.salario*0.25);
-  log(`Partida: nota ${nota.toFixed(1)}${gol?" · ⚽ gol":""}${ass?" · 🅰️ assistência":""}`, "jogo");
+/* ---------- Tempo, calendário e liga ---------- */
+const CLUBES_LIGA = ["Valmont FC","Alvorada Atlético","Serrano Esporte Clube","Rio Azul FC","Porto Verde","Monte Alto FC","Cidade Nova EC","União Sul FC"];
+const TEMPORADA_RODADAS = 14;
+const DIA_JOGO = 6;            // sábado
+const CHANCE_EVENTO_DIA = 0.10;
+const COOLDOWN_EVENTO = 120;    // dias até um evento poder se repetir
+
+function gerarCalendario(times){
+  // método do círculo: 8 times -> 7 rodadas de ida, espelhadas na volta (14 rodadas)
+  const n = times.length;
+  const fixo = times[0];
+  let rot = times.slice(1);
+  const ida = [];
+  for(let i=0;i<n-1;i++){
+    const ordem = [fixo, ...rot];
+    const jogos = [];
+    for(let j=0;j<n/2;j++){
+      const a = ordem[j], b = ordem[n-1-j];
+      jogos.push(i%2===0 ? [a,b] : [b,a]);
+    }
+    ida.push(jogos);
+    rot = [rot[rot.length-1], ...rot.slice(0,-1)];
+  }
+  const volta = ida.map(rd => rd.map(([a,b]) => [b,a]));
+  return [...ida, ...volta];
 }
 
-/* ---------- Escolhas ---------- */
-function fazerTreino(id){
-  const t = TREINOS.find(x=>x.id===id);
-  const ganhoBase = 1 + (P.mente.disciplina>60?1:0);
-  for(const k of t.ganha){ if(P.at[k]!==undefined) P.at[k] = clamp(P.at[k]+(Math.random()<0.6?ganhoBase:0),0,99); }
-  aplicar(t.custo);
-  if(t.extra?.saude) aplicar({saude:t.extra.saude});
-  if(t.extra?.disciplina) aplicar({disciplina:t.extra.disciplina});
-  if(t.extra?.estudo) aplicar({estudo:t.extra.estudo});
-  log(`Treino: ${t.nome}`, "treino");
+function gerarTemporada(){
+  const nomeP = P.carreira.clube;
+  const outros = CLUBES_LIGA.filter(n => n!==nomeP).slice(0,7);
+  const times = [nomeP, ...outros];
+  const temporada = (P.liga?.temporada || 0) + 1;
+  P.liga = {
+    temporada,
+    tabela: times.map(n => ({nome:n, j:0, v:0, e:0, d:0, gp:0, gc:0, pts:0})),
+    forca: Object.fromEntries(times.map(n => [n, r(42,68)])),
+  };
+  P.liga.forca[nomeP] = clamp(P.liga.forca[nomeP] ?? 52, 42, 68);
+  P.calendario = gerarCalendario(times);
 }
-function fazerAtividade(id){
-  const a = ATIVIDADES.find(x=>x.id===id);
-  const e = {...a.efeito};
-  if(e.rel_familia){ P.rel.familia = clamp(P.rel.familia+e.rel_familia,0,100); delete e.rel_familia; }
-  if(e.rel_amigos){ P.rel.amigos = clamp(P.rel.amigos+e.rel_amigos,0,100); delete e.rel_amigos; }
-  aplicar(e);
-  log(`${a.nome}: ${a.desc}`, "atividade");
+
+function forcaTime(n){ return P.liga?.forca?.[n] ?? 50; }
+
+function jogoDoJogadorNaRodada(rodada){
+  if(!P.calendario || rodada<1 || rodada>TEMPORADA_RODADAS) return null;
+  const j = P.calendario[rodada-1] || [];
+  return j.find(([a,b]) => a===P.carreira.clube || b===P.carreira.clube) || null;
+}
+function jogoDeHoje(){ return P.dia===DIA_JOGO ? jogoDoJogadorNaRodada(P.semana) : null; }
+function jogoPendenteHoje(){ return !!jogoDeHoje() && P.jogoFeito !== chaveSemana(); }
+
+function aplicarResultadoTabela(a, ga, b, gb){
+  const T = P.liga.tabela;
+  const ta = T.find(t=>t.nome===a), tb = T.find(t=>t.nome===b);
+  if(!ta || !tb) return;
+  ta.j++; tb.j++; ta.gp+=ga; ta.gc+=gb; tb.gp+=gb; tb.gc+=ga;
+  if(ga>gb){ ta.v++; ta.pts+=3; tb.d++; }
+  else if(ga<gb){ tb.v++; tb.pts+=3; ta.d++; }
+  else { ta.e++; tb.e++; ta.pts++; tb.pts++; }
+}
+
+function poisson(l){ const L=Math.exp(-l); let k=0, p=1; do{ k++; p*=Math.random(); }while(p>L); return k-1; }
+function simularPlacar(fa, fb){
+  const lam = x => Math.max(0.3, 1.1 + (x-50)/40);
+  return [poisson(lam(fa)), poisson(lam(fb))];
+}
+function simularOutrosJogos(rodada){
+  (P.calendario[rodada-1]||[]).forEach(([a,b]) => {
+    if(a===P.carreira.clube || b===P.carreira.clube) return;
+    const [ga,gb] = simularPlacar(forcaTime(a), forcaTime(b));
+    aplicarResultadoTabela(a, ga, b, gb);
+  });
+}
+
+/* ---------- Partida: pré-jogo e lances com decisões ---------- */
+const TATICAS = [
+  {id:"ofensiva", nome:"Ofensiva", desc:"Mais ataques, mas o contra-ataque do adversário fica mais perigoso.", atq:+0.06, def:-0.06},
+  {id:"equilibrada", nome:"Equilibrada", desc:"Sem exageros, de olho nos dois lados.", atq:0, def:0},
+  {id:"defensiva", nome:"Defensiva", desc:"Fecha a defesa e espera a chance.", atq:-0.05, def:+0.06},
+];
+const INSTRUCOES = [
+  {id:"gol", nome:"Procurar o gol", desc:"Você busca a finalização sempre que puder.", atq:+0.05, pas:0},
+  {id:"equipe", nome:"Ajudar a equipe", desc:"Você prioriza o passe para os companheiros.", atq:0, pas:+0.07},
+  {id:"calma", nome:"Jogar com calma", desc:"Menos risco, menos brilho.", atq:-0.02, pas:+0.02},
+];
+
+const LANCES = [
+  { tipo:"ataque", titulo:"Ataque pela direita", texto:"Você recebe a bola no meio-campo com espaço à frente.",
+    opcoes:[
+      {t:"Chutar de fora", attr:"finalizacao", base:0.38, acao:"chute"},
+      {t:"Tocar para o ponta", attr:"passe", base:0.50, acao:"passe"},
+      {t:"Driblar para a área", attr:"drible", base:0.38, acao:"drible"},
+      {t:"Segurar a bola", attr:"visao", base:0.90, acao:"segura"},
+    ]},
+  { tipo:"defesa", titulo:"Contra-ataque adversário", texto:"O adversário sai em velocidade e chega perto da sua área.",
+    opcoes:[
+      {t:"Marcar o atacante", attr:"defesa", base:0.55, acao:"marca"},
+      {t:"Pressionar alto", attr:"velocidade", base:0.42, acao:"pressao"},
+      {t:"Recuar e fechar", attr:"resistencia", base:0.70, acao:"recua"},
+    ]},
+  { tipo:"parada", titulo:"Falta perto da área", texto:"Falta a 25 metros. A barreira está montada.",
+    opcoes:[
+      {t:"Bater direto", attr:"finalizacao", base:0.25, acao:"chute"},
+      {t:"Tocar para um colega", attr:"passe", base:0.55, acao:"passe"},
+      {t:"Cabecear na área", attr:"velocidade", base:0.35, acao:"chute"},
+    ]},
+  { tipo:"fim", titulo:"Reta final", texto:"Faltam poucos minutos. O que você faz com o time?",
+    opcoes:[
+      {t:"Atacar até o fim", attr:"resistencia", base:0.50, acao:"fim_ataque"},
+      {t:"Segurar o resultado", attr:"defesa", base:0.65, acao:"fim_defesa"},
+    ]},
+];
+
+const TEXTOS = {
+  gol_chute:["Golaço de fora da área! A bola entra no canto.","Chute forte, sem chance para o goleiro. Gol!"],
+  defendido:["O goleiro faz a defesa com as mãos.","Chute forte, mas para o goleiro."],
+  erro_chute:["A bola sai pela linha de fundo.","Chute alto, para fora."],
+  passe_ok:["O passe chega certinho ao ponta.","Passe quebra-linhas, o time avança."],
+  passe_gol:["O ponta finaliza e marca! Você deu a assistência."],
+  passe_erro:["O passe é interceptado no meio."],
+  drible_ok:["Você passa por dois marcadores.","Drible limpo, o time ganha campo."],
+  drible_gol:["Depois do drible, você finaliza e marca!"],
+  drible_erro:["O zagueiro toma a bola no pé."],
+  segura_ok:["Você segura a bola e o tempo passa."],
+  marca_ok:["Você acompanha o atacante e desarma."],
+  marca_erro:["O atacante passa pela sua marcação."],
+  pressao_ok:["A pressão faz o adversário errar."],
+  pressao_erro:["Você chega tarde e sai falta."],
+  recua_ok:["Você fecha o espaço e a jogada morre."],
+  recua_erro:["Você recua demais e o adversário chega livre."],
+  fim_ataque_gol:["Nos minutos finais, o time marca!"],
+  fim_ataque_erro:["O ataque insiste, mas a bola não entra."],
+  fim_defesa_ok:["O time segura o resultado até o apito."],
+  fim_defesa_erro:["Uma falha no fim do jogo, e o adversário chega."],
+  contra_gol:["O adversário marca no contra-ataque."],
+};
+const pickTxt = k => pick(TEXTOS[k] || ["..."]);
+
+function iniciarPartida(){
+  const jogo = jogoDeHoje();
+  if(!jogo || P.jogoFeito===chaveSemana()) return;
+  const adv = jogo[0]===P.carreira.clube ? jogo[1] : jogo[0];
+  P.partida = { rodada:P.semana, adv, mandante: jogo[0]===P.carreira.clube, fase:"pre", tatica:null, instrucao:null, lance:0, gP:0, gA:0, gJ:0, asJ:0, log:[] };
+  salvar(); render();
+}
+function escolherTatica(id){ P.partida.tatica = id; salvar(); render(); }
+function escolherInstrucao(id){ P.partida.instrucao = id; salvar(); render(); }
+function comecarJogo(){
+  const pt = P.partida;
+  if(!pt || !pt.tatica || !pt.instrucao) return;
+  pt.fase = "jogo";
+  salvar(); render();
+}
+
+function resolverLance(i){
+  const pt = P.partida;
+  const lance = LANCES[pt.lance];
+  const op = lance.opcoes[i];
+  const tat = TATICAS.find(t=>t.id===pt.tatica);
+  const ins = INSTRUCOES.find(x=>x.id===pt.instrucao);
+  const at = P.at[op.attr] ?? 50;
+  const forma = (P.corpo.forma-50)*0.002;
+  const estresse = -(P.mente.estresse-30)*0.0015;
+  const ataque = lance.tipo==="ataque" || lance.tipo==="parada";
+
+  let p = op.base + (at-50)*0.006 + forma + estresse;
+  if(ataque) p += tat.atq + ins.atq;
+  if(lance.tipo==="defesa") p += tat.def;
+  if(op.acao==="passe") p += ins.pas;
+  if(op.acao==="segura") p = 0.95;
+  p = clamp(p, 0.05, 0.92);
+  const acerto = Math.random() < p;
+
+  const forcaAdv = forcaTime(pt.adv);
+  const pContra = clamp(0.16 + (forcaAdv-50)/200 + (tat.def<0?0.03:0) - tat.def*0.5, 0.05, 0.6);
+
+  let texto = "", gol=false, golJ=false, asst=false, contra=false;
+
+  if(ataque){
+    if(op.acao==="chute"){
+      if(acerto){
+        if(Math.random() < 0.55 + (at-50)/200){ gol=true; golJ=true; texto=pickTxt("gol_chute"); }
+        else texto=pickTxt("defendido");
+      } else texto=pickTxt("erro_chute");
+    } else if(op.acao==="passe"){
+      if(acerto){
+        if(Math.random()<0.42){ gol=true; asst=true; texto=pickTxt("passe_gol"); }
+        else texto=pickTxt("passe_ok");
+      } else texto=pickTxt("passe_erro");
+    } else if(op.acao==="drible"){
+      if(acerto){
+        if(Math.random()<0.30){ gol=true; golJ=true; texto=pickTxt("drible_gol"); }
+        else texto=pickTxt("drible_ok");
+      } else texto=pickTxt("drible_erro");
+    } else {
+      texto=pickTxt("segura_ok");
+    }
+    if(!acerto && op.acao!=="segura") contra = Math.random()<pContra;
+  } else if(lance.tipo==="defesa"){
+    if(acerto) texto = pickTxt(op.acao+"_ok");
+    else { texto = pickTxt(op.acao+"_erro"); contra = Math.random() < pContra + 0.15; }
+  } else {
+    if(op.acao==="fim_ataque"){
+      if(Math.random() < (acerto?0.32:0.12)){ gol=true; texto=pickTxt("fim_ataque_gol"); }
+      else texto=pickTxt("fim_ataque_erro");
+      contra = Math.random() < (acerto?0.15:0.30);
+    } else {
+      texto = pickTxt(acerto?"fim_defesa_ok":"fim_defesa_erro");
+      contra = Math.random() < (acerto?0.06:0.20);
+    }
+  }
+
+  if(gol) pt.gP++;
+  if(golJ) pt.gJ++;
+  if(asst) pt.asJ++;
+  if(contra){ pt.gA++; texto += " " + pickTxt("contra_gol"); }
+  pt.log.push({ titulo:lance.titulo, escolha:op.t, texto, placar:[pt.gP,pt.gA], marcou:gol, sofreu:contra });
+
+  pt.lance++;
+  if(pt.lance >= LANCES.length) finalizarPartida();
+  else { salvar(); render(); }
+}
+
+function finalizarPartida(){
+  const pt = P.partida;
+  const res = pt.gP>pt.gA ? "V" : pt.gP<pt.gA ? "D" : "E";
+  aplicarResultadoTabela(P.carreira.clube, pt.gP, pt.adv, pt.gA);
+  simularOutrosJogos(pt.rodada);
+
+  const nota = clamp(6 + pt.gJ*1.2 + pt.asJ*0.8 - pt.gA*0.3 + (P.corpo.forma-50)/60 + (Math.random()-0.5), 3, 10);
+  P.stats.jogos++; P.stats.gols += pt.gJ; P.stats.assist += pt.asJ; P.stats.notas.push(Number(nota.toFixed(1)));
+  if(res==="V"){ P.vida.dinheiro += 400; P.mente.reputacao = clamp(P.mente.reputacao+1,0,100); P.mente.felicidade = clamp(P.mente.felicidade+6,0,100); }
+  else if(res==="E"){ P.vida.dinheiro += 150; }
+  else { P.mente.reputacao = clamp(P.mente.reputacao-1,0,100); P.mente.felicidade = clamp(P.mente.felicidade-4,0,100); }
+  P.corpo.forma = clamp(P.corpo.forma-6,0,100);
+  P.mente.estresse = clamp(P.mente.estresse + (res==="V"?-2:5),0,100);
+
+  P.resultados = P.resultados || {};
+  P.resultados[pt.rodada] = `${pt.gP}x${pt.gA}`;
+  P.ultimoJogo = { adv:pt.adv, placar:[pt.gP,pt.gA], res, nota:nota.toFixed(1), gj:pt.gJ, asj:pt.asJ };
+  log(`Partida vs ${pt.adv}: ${pt.gP}x${pt.gA}. Nota ${nota.toFixed(1)}.`, "jogo");
+  P.jogoFeito = chaveSemana();
+  P.partida = null;
+  salvar(); render();
 }
 
 /* ---------- Eventos ---------- */
 function sortearEvento(){
-  const elegiveis = EVENTOS.filter(ev => { try{ return ev.cond(P); }catch{ return false; } });
+  P.cooldown = P.cooldown || {};
+  const elegiveis = EVENTOS.filter(ev => {
+    const ultimo = P.cooldown[ev.id];
+    if(ultimo !== undefined && P.diaAbs - ultimo < COOLDOWN_EVENTO) return false;
+    try { return ev.cond(P); } catch { return false; }
+  });
   if(!elegiveis.length) return null;
   const total = elegiveis.reduce((s,e)=>s+e.peso,0);
   let x = Math.random()*total;
@@ -599,10 +886,7 @@ function resolverEventoAtual(i){
   const ev = P.eventoAtual; if(!ev) return;
   const op = ev.opcoes[i];
   aplicar(op.efeito);
-  if(op.mudaClube){
-    const prox = DADOS.clubes.find(c=>c.nivel===P.carreira.nivel+1);
-    if(prox){ P.carreira.clube = prox.nome; P.carreira.nivel = prox.nivel; P.carreira.salario = Math.round(P.carreira.salario*1.6); }
-  }
+  if(op.sorte){ aplicar({dinheiro: Math.random()<op.sorte.p ? op.sorte.ganho : op.sorte.perda}); }
   if(op.flag) P.flags[op.flag] = true;
   if(op.chance && Math.random()<op.chance.p) P.flags[op.chance.flag] = true;
   log(op.log || op.t, "evento");
@@ -612,7 +896,7 @@ function resolverEventoAtual(i){
 
 /* ---------- Compras ---------- */
 function comprar(tipo, id){
-  const lista = tipo==="veiculo"?DADOS.veiculos:DADOS.casas;
+  const lista = tipo==="veiculo" ? DADOS.veiculos : DADOS.casas;
   const item = lista.find(x=>x.id===id);
   if(P.vida.dinheiro < item.preco){ alert("Dinheiro insuficiente."); return; }
   if(tipo==="veiculo"){
@@ -627,38 +911,61 @@ function comprar(tipo, id){
   salvar(); render();
 }
 
-/* ---------- Semana ---------- */
-function encerrarSemana(){
+/* ---------- Atividades (uma por dia) e semana ---------- */
+function atividade(id){
+  if(P.diaAtividade === P.diaAbs) return;
+  const a = ATIVIDADES.find(x=>x.id===id);
+  const e = {...a.efeito};
+  if(e.rel_familia){ P.rel.familia = clamp(P.rel.familia+e.rel_familia,0,100); delete e.rel_familia; }
+  if(e.rel_amigos){ P.rel.amigos = clamp(P.rel.amigos+e.rel_amigos,0,100); delete e.rel_amigos; }
+  aplicar(e);
+  P.diaAtividade = P.diaAbs;
+  log(`${a.nome}: ${a.desc}`, "atividade");
+  salvar(); render();
+}
+
+function fecharSemana(){
   let custo = 0;
   for(const id of P.vida.veiculos) custo += DADOS.veiculos.find(v=>v.id===id).manut/4;
   if(!P.vida.casa) custo += P.vida.aluguel/4;
   P.vida.dinheiro -= Math.round(custo);
   P.vida.dinheiro += Math.round(P.carreira.salario/4);
-  P.corpo.forma = clamp(P.corpo.forma-1,0,100);
+  P.corpo.forma = clamp(P.corpo.forma + Math.round((70-P.corpo.forma)*0.18),0,100);
   P.mente.estresse = clamp(P.mente.estresse-1,0,100);
   if(P.corpo.saude < 60) P.mente.felicidade = clamp(P.mente.felicidade-1,0,100);
+  declinioIdade();
+
   P.semana++;
-  if(P.semana > 52){ P.semana = 1; P.idade++; P.ano++; log(`Aniversário: agora você tem ${P.idade} anos.`, "idade"); }
+  if(P.semana === TEMPORADA_RODADAS+1) fecharTemporada();
+  if(P.semana > 52){ P.semana = 1; P.ano++; P.idade++; log(`Aniversário: agora você tem ${P.idade} anos.`, "idade"); }
+  if(P.semana === 1) gerarTemporada();
 }
-function proximaSemana(){
-  // partida da semana (60%)
-  if(Math.random()<0.6) partida();
-  encerrarSemana();
-  P.eventoAtual = Math.random()<0.4 ? sortearEvento() : null;
+
+function fecharTemporada(){
+  const tab = [...P.liga.tabela].sort((a,b)=> b.pts-a.pts || (b.gp-b.gc)-(a.gp-a.gc));
+  const pos = tab.findIndex(t=>t.nome===P.carreira.clube)+1;
+  if(pos===1){ P.carreira.titulos++; P.vida.dinheiro += 2000; P.mente.reputacao = clamp(P.mente.reputacao+5,0,100); log(`Campeão da temporada ${P.liga.temporada}!`, "conquista"); }
+  else log(`Terminou a temporada ${P.liga.temporada} em ${pos}º lugar.`, "evento");
+}
+
+function avancarDia(){
+  if(P.eventoAtual || jogoPendenteHoje() || P.partida) return;
+  P.diaAbs++;
+  P.dia++;
+  if(P.dia > 7){ P.dia = 1; fecharSemana(); }
+  if(P.dia !== DIA_JOGO && !P.eventoAtual && Math.random() < CHANCE_EVENTO_DIA){
+    const ev = sortearEvento();
+    if(ev){ P.eventoAtual = ev; P.cooldown[ev.id] = P.diaAbs; }
+  }
   salvar(); render();
 }
 
-function treinar(id){ fazerTreino(id); salvar(); render(); }
-function atividade(id){ fazerAtividade(id); salvar(); render(); }
 function ir(t){ P.tela=t; salvar(); render(); }
 
-/* =========================================================
-   TELAS
-   ========================================================= */
 const TELAS = [
-  {id:"inicio", nome:"Início"}, {id:"treino", nome:"Treino"}, {id:"vida", nome:"Vida"},
-  {id:"compras", nome:"Compras"}, {id:"carreira", nome:"Carreira"}, {id:"historico", nome:"Histórico"},
-  {id:"perfil", nome:"Perfil"},
+  {id:"inicio", nome:"Hoje"}, {id:"treino", nome:"Treino"}, {id:"calendario", nome:"Calendário"},
+  {id:"vida", nome:"Vida"}, {id:"compras", nome:"Compras"}, {id:"carreira", nome:"Carreira"},
+  {id:"historico", nome:"Histórico"}, {id:"perfil", nome:"Perfil"},
 ];
 
 function barra(v){ return `<div class="bar"><i style="width:${v}%"></i></div>`; }
@@ -678,13 +985,14 @@ function render(){
       <section class="hero">
         <div class="avatar">${avatarSVG({pele:2,rosto:0,olhos:2,corOlhos:2,sobrancelha:0,nariz:1,boca:0,cabelo:7,cabeloCor:6,barba:0,sardas:true,bochecha:true,camisa:2})}</div>
         <div><h2>Sua vida, sua carreira</h2>
-        <p class="mut">Crie seu personagem, escolha sua origem e escreva a história. Depois, cada semana é uma decisão.</p>
+        <p class="mut">Crie seu personagem, escolha sua origem e escreva a história. Depois, cada dia é uma decisão.</p>
         <button class="b primary" onclick="iniciarCriador()">Criar personagem</button></div>
       </section>`;
     return;
   }
   if(P.idade >= IDADE_MAX){ return aposentar(); }
-  const fn = {inicio:telaInicio, treino:telaTreino, vida:telaVida, compras:telaCompras, carreira:telaCarreira, historico:telaHistorico, perfil:telaPerfil}[P.tela] || telaInicio;
+  if(P.partida){ app().innerHTML = telaPartida(); return; }
+  const fn = {inicio:telaInicio, treino:telaTreino, calendario:telaCalendario, vida:telaVida, compras:telaCompras, carreira:telaCarreira, historico:telaHistorico, perfil:telaPerfil}[P.tela] || telaInicio;
   app().innerHTML = fn();
 }
 
@@ -709,36 +1017,309 @@ function telaInicio(){
       <p>${P.eventoAtual.texto}</p>
       <div class="btns">${P.eventoAtual.opcoes.map((o,i)=>`<button class="b" onclick="resolverEventoAtual(${i})">${o.t}</button>`).join("")}</div>
     </div>` : "";
+
+  const jogoHoje = jogoDeHoje();
+  const adv = jogoHoje ? (jogoHoje[0]===P.carreira.clube ? jogoHoje[1] : jogoHoje[0]) : null;
+  const proximo = (!jogoHoje && P.semana<=TEMPORADA_RODADAS && P.dia<DIA_JOGO)
+    ? jogoDoJogadorNaRodada(P.semana) : null;
+
+  const cardJogo = jogoPendenteHoje() ? `
+    <div class="card" style="border-color:var(--gold)">
+      <h3>Dia de jogo</h3>
+      <p>Hoje você enfrenta <b>${adv}</b> pela rodada ${P.semana}.</p>
+      <div class="btns"><button class="b primary" onclick="iniciarPartida()">Entrar em campo</button></div>
+    </div>` : (proximo ? `
+    <div class="card">
+      <h3>Próximo jogo</h3>
+      <p class="mut">Sábado: contra <b>${proximo[0]===P.carreira.clube?proximo[1]:proximo[0]}</b> (rodada ${P.semana})</p>
+    </div>` : "");
+
+  const ultimo = P.ultimoJogo ? `
+    <div class="card">
+      <h3>Último jogo</h3>
+      <p><b>${P.ultimoJogo.res==="V"?"Vitória":P.ultimoJogo.res==="E"?"Empate":"Derrota"}</b> · ${P.ultimoJogo.placar[0]}x${P.ultimoJogo.placar[1]} contra ${P.ultimoJogo.adv} · nota ${P.ultimoJogo.nota}</p>
+    </div>` : "";
+
+  const podeAtividade = P.diaAtividade !== P.diaAbs;
+  const treinou = jaTreinouNestaSemana();
+  const bloqueio = P.eventoAtual ? "Resolva o evento para continuar."
+    : jogoPendenteHoje() ? "Jogue a partida para continuar."
+    : "";
+
   return `
     <section class="hero">
       <div class="avatar">${avatarHTML(P)}</div>
       <div>
+        <div class="kicker">Semana ${P.semana} · dia ${P.dia}/7 · ${P.ano}</div>
         <h2>${P.perfil.nome}</h2>
-        <p class="mut">${P.carreira.clube} · ${P.idade} anos · ${P.perfil.cidade}, ${P.perfil.pais}</p>
-        <p class="mut">R$ ${P.vida.dinheiro.toLocaleString("pt-BR")}</p>
-        <div class="btns" style="margin-top:12px">
-          <button class="b primary" onclick="proximaSemana()">Avançar semana →</button>
-          <button class="b" onclick="ir('treino')">Treinar</button>
-        </div>
+        <p class="mut">${P.carreira.clube} · ${P.idade} anos · R$ ${P.vida.dinheiro.toLocaleString("pt-BR")}</p>
       </div>
     </section>
+    ${cardJogo}
     ${ev}
+    ${ultimo}
+    <div class="card">
+      <h3>Ações de hoje</h3>
+      <div class="btns">
+        <button class="b" ${treinou?"disabled":""} onclick="ir('treino')">Treinar${treinou?" (já treinou esta semana)":""}<small>Um treino por semana</small></button>
+        <button class="b" ${podeAtividade?"":"disabled"} onclick="document.getElementById('atv').scrollIntoView()">Atividade${podeAtividade?"":" (já fez hoje)"}<small>Uma por dia</small></button>
+      </div>
+      <div id="atv" style="margin-top:12px">
+        <div class="btns">${ATIVIDADES.map(a=>`<button class="b" ${podeAtividade?"":"disabled"} onclick="atividade('${a.id}')">${a.nome}<small>${a.desc}</small></button>`).join("")}</div>
+      </div>
+      <div class="btns" style="margin-top:14px">
+        <button class="b primary" ${bloqueio?"disabled":""} onclick="avancarDia()">Próximo dia →</button>
+        ${bloqueio?`<span class="mut" style="align-self:center">${bloqueio}</span>`:""}
+      </div>
+    </div>
     <div class="grid">
       ${statBox("Forma", P.corpo.forma)}${statBox("Saúde", P.corpo.saude)}
       ${statBox("Felicidade", P.mente.felicidade)}${statBox("Estresse", P.mente.estresse)}
     </div>`;
 }
 
-function telaTreino(){
-  return `
-    <div class="card"><h3>Treinos</h3>
-      <div class="btns">${TREINOS.map(t=>`<button class="b" onclick="treinar('${t.id}')">${t.nome}<small>${t.desc}</small></button>`).join("")}</div>
+function telaPartida(){
+  const pt = P.partida;
+  const cabecalho = `
+    <section class="hero">
+      <div>
+        <div class="kicker">Rodada ${pt.rodada} · ${pt.mandante?"Em casa":"Fora"}</div>
+        <h2>${P.carreira.clube} x ${pt.adv}</h2>
+        <p class="mut">Placar: <b>${pt.gP} x ${pt.gA}</b></p>
+      </div>
+    </section>`;
+
+  if(pt.fase === "pre"){
+    return `${cabecalho}
+      <div class="card">
+        <h3>Antes do jogo · tática</h3>
+        <div class="btns">${TATICAS.map(t=>`<button class="b ${pt.tatica===t.id?"sel":""}" onclick="escolherTatica('${t.id}')">${t.nome}<small>${t.desc}</small></button>`).join("")}</div>
+      </div>
+      <div class="card">
+        <h3>Antes do jogo · sua instrução</h3>
+        <div class="btns">${INSTRUCOES.map(x=>`<button class="b ${pt.instrucao===x.id?"sel":""}" onclick="escolherInstrucao('${x.id}')">${x.nome}<small>${x.desc}</small></button>`).join("")}</div>
+      </div>
+      <div class="btns"><button class="b primary" ${pt.tatica&&pt.instrucao?"":"disabled"} onclick="comecarJogo()">Começar o jogo</button></div>`;
+  }
+
+  const lance = LANCES[pt.lance];
+  const historico = pt.log.map(l=>`<p><span class="mut">${l.titulo}:</span> ${l.texto} <b>(${l.placar[0]}x${l.placar[1]})</b></p>`).join("");
+  return `${cabecalho}
+    <div class="card ev">
+      <h3>Lance ${pt.lance+1} de ${LANCES.length} · ${lance.titulo}</h3>
+      <p>${lance.texto}</p>
+      <div class="btns">${lance.opcoes.map((o,i)=>`<button class="b" onclick="resolverLance(${i})">${o.t}</button>`).join("")}</div>
     </div>
+    <div class="card log">${historico || "<p class='mut'>O jogo começou.</p>"}</div>`;
+}
+
+function telaCalendario(){
+  const tab = [...P.liga.tabela].sort((a,b)=> b.pts-a.pts || (b.gp-b.gc)-(a.gp-a.gc));
+  const linhas = tab.map((t,i)=>`
+    <tr class="${t.nome===P.carreira.clube?"me":""}">
+      <td>${i+1}</td><td>${t.nome}</td><td>${t.j}</td><td>${t.v}</td><td>${t.e}</td><td>${t.d}</td>
+      <td>${t.gp-t.gc}</td><td><b>${t.pts}</b></td>
+    </tr>`).join("");
+
+  const rodadas = P.calendario.map((jogos,i)=>{
+    const meu = jogos.find(([a,b])=>a===P.carreira.clube||b===P.carreira.clube);
+    if(!meu) return "";
+    const adv = meu[0]===P.carreira.clube ? meu[1] : meu[0];
+    const res = P.resultados?.[i+1];
+    const atual = i+1===P.semana;
+    return `<div class="row"><span>${atual?"<b>▶ ":""}Rodada ${i+1}${atual?"</b>":""}</span><span>${meu[0]===P.carreira.clube?"vs":"@"} ${adv}</span><span class="mut">${res || (i+1<P.semana?"–":"")}</span></div>`;
+  }).join("");
+
+  return `
+    <div class="card">
+      <h3>Tabela · temporada ${P.liga.temporada}</h3>
+      <div style="overflow-x:auto">
+      <table class="tbl">
+        <tr><th>#</th><th>Clube</th><th>J</th><th>V</th><th>E</th><th>D</th><th>SG</th><th>Pts</th></tr>
+        ${linhas}
+      </table></div>
+    </div>
+    <div class="card">
+      <h3>Seus jogos</h3>
+      ${rodadas}
+    </div>`;
+}
+
+/* ---------- Treino: uma sessão por semana, com duas decisões ---------- */
+const NOME_ATRIBUTO = {
+  finalizacao:"Finalização", passe:"Passe", drible:"Drible", defesa:"Defesa",
+  velocidade:"Velocidade", resistencia:"Resistência", visao:"Visão de jogo",
+};
+
+// Decisão 1: no que treinar. Cada foco trabalha um ou dois atributos.
+const FOCOS = [
+  { id:"finalizacao", nome:"Finalização", desc:"Chutes e finalização", attrs:["finalizacao"] },
+  { id:"passe", nome:"Passe", desc:"Passes curtos e longos", attrs:["passe"] },
+  { id:"drible", nome:"Drible", desc:"Condução e controle", attrs:["drible"] },
+  { id:"visao", nome:"Visão de jogo", desc:"Leitura e posicionamento", attrs:["visao"] },
+  { id:"defesa", nome:"Marcação", desc:"Defesa e marcação", attrs:["defesa"] },
+  { id:"fisico", nome:"Preparo físico", desc:"Velocidade ou resistência", attrs:["velocidade","resistencia"] },
+  { id:"estudo", nome:"Estudo tático", desc:"Não mexe nos atributos, mas rende estudo e disciplina", attrs:[] },
+];
+
+// Decisão 2: como treinar. Mais intensidade rende mais, mas cansa e arrisca mais.
+const METODOS = [
+  { id:"leve", nome:"Leve", desc:"Pouco desgaste. Progresso mais lento e seguro.",
+    forma:-2, estresse:+2, pGanho:0.65, pPerda:0.05, lesao:0.00, xpGanho:1 },
+  { id:"moderado", nome:"Moderado", desc:"Equilíbrio entre esforço e resultado.",
+    forma:-4, estresse:+4, pGanho:0.55, pPerda:0.12, lesao:0.01, xpGanho:1 },
+  { id:"intenso", nome:"Intenso", desc:"Muito esforço. Pode render bastante ou desandar.",
+    forma:-6, estresse:+6, pGanho:0.35, pPerda:0.22, lesao:0.03, xpGanho:2 },
+];
+
+// Progresso necessário para subir um ponto. Cresce com o nível, então a evolução fica lenta.
+const XP_NECESSARIO = lvl => Math.max(8, Math.round(8 + (lvl-30)*0.4));
+
+function chaveSemana(){ return `${P.ano}-${P.semana}`; }
+function jaTreinouNestaSemana(){ return P.ultimoTreino === chaveSemana(); }
+
+// Chances estimadas para o jogador ver antes de decidir (sem revelar o sorteio).
+function chancesTreino(focoId, metodoId){
+  const foco = FOCOS.find(f=>f.id===focoId);
+  const met = METODOS.find(m=>m.id===metodoId);
+  if(!foco || !met || foco.attrs.length===0) return null;
+  const attr = foco.attrs[0];
+  const lvl = P.at[attr];
+  const fForma = clamp((P.corpo.forma-10)/50, 0.5, 1.3);
+  const dif = clamp(1 - (lvl-40)/80, 0.2, 1);
+  const disc = 0.8 + P.mente.disciplina/250;
+  const pG = clamp(met.pGanho * fForma * dif * disc, 0.02, 0.9);
+  const pP = clamp(met.pPerda * (1 + P.mente.estresse/200), 0, 0.9);
+  return { ganho: Math.round(pG*100), perda: Math.round(pP*100), lesao: Math.round(met.lesao*100) };
+}
+
+function subirOuDescerNivel(attr){
+  let lvl = P.at[attr];
+  P.xp[attr] = P.xp[attr] || 0;
+  // Sobe de nível quando acumula progresso suficiente.
+  while(P.xp[attr] >= XP_NECESSARIO(lvl) && lvl < 99){
+    P.xp[attr] -= XP_NECESSARIO(lvl);
+    lvl++;
+    log(`${NOME_ATRIBUTO[attr]} subiu para ${lvl}.`, "evolucao");
+  }
+  // Perder progresso reduz o acumulado. Só cai de nível depois de um déficit grande,
+  // e volta com a metade do progresso do nível novo, para não devolver tudo de uma vez.
+  while(P.xp[attr] < -Math.floor(XP_NECESSARIO(lvl)/2) && lvl > 10){
+    lvl--;
+    P.xp[attr] = Math.floor(XP_NECESSARIO(lvl)/2);
+    log(`${NOME_ATRIBUTO[attr]} caiu para ${lvl}.`, "evolucao");
+  }
+  P.at[attr] = lvl;
+}
+
+function executarTreino(focoId, metodoId){
+  const foco = FOCOS.find(f=>f.id===focoId);
+  const met = METODOS.find(m=>m.id===metodoId);
+  if(jaTreinouNestaSemana()) return;
+
+  aplicar({forma:met.forma, estresse:met.estresse});
+  let msg;
+
+  if(foco.attrs.length === 0){
+    aplicar({estudo:2});
+    if(Math.random()<0.5) aplicar({disciplina:1});
+    msg = "Você estudou o jogo com calma. Pontos de estudo aumentaram.";
+  } else {
+    const attr = pick(foco.attrs);
+    const ch = chancesTreino(focoId, metodoId);
+    const u = Math.random();
+    if(u < ch.ganho/100){
+      P.xp[attr] = (P.xp[attr]||0) + met.xpGanho;
+      msg = `Bom treino: progresso em ${NOME_ATRIBUTO[attr]}.`;
+    } else if(u > 1 - ch.perda/100){
+      P.xp[attr] = (P.xp[attr]||0) - 1;
+      msg = `Treino ruim: você perdeu progresso em ${NOME_ATRIBUTO[attr]}.`;
+    } else {
+      msg = `Treino sem avanço claro em ${NOME_ATRIBUTO[attr]}.`;
+    }
+    subirOuDescerNivel(attr);
+  }
+
+  if(Math.random() < met.lesao){
+    aplicar({saude:-8, forma:-6});
+    msg += " Você sentiu uma lesão leve.";
+  }
+
+  P.ultimoTreino = chaveSemana();
+  P.ultimoResultado = { foco: foco.nome, metodo: met.nome, msg };
+  log(`Treino (${foco.nome}, ${met.nome}): ${msg}`, "treino");
+}
+
+// Com a idade, velocidade e resistência podem cair um pouco.
+function declinioIdade(){
+  if(P.idade < 34 || Math.random() > 0.012) return;
+  const attr = pick(["velocidade","resistencia"]);
+  P.at[attr] = clamp(P.at[attr]-1, 10, 99);
+  log(`Com a idade, ${NOME_ATRIBUTO[attr]} caiu para ${P.at[attr]}.`, "evolucao");
+}
+
+let TR = { foco:null, metodo:null };
+function escolherFoco(id){ TR.foco = id; render(); }
+function escolherMetodo(id){ TR.metodo = id; render(); }
+function confirmarTreino(){
+  if(!TR.foco || !TR.metodo || jaTreinouNestaSemana()) return;
+  executarTreino(TR.foco, TR.metodo);
+  TR = { foco:null, metodo:null };
+  salvar(); render();
+}
+
+function telaTreino(){
+  const feito = jaTreinouNestaSemana();
+  const res = P.ultimoResultado;
+
+  const focos = FOCOS.map(f=>`
+    <button class="b ${TR.foco===f.id?"sel":""}" ${feito?"disabled":""} onclick="escolherFoco('${f.id}')">${f.nome}<small>${f.desc}</small></button>`).join("");
+
+  const metodos = METODOS.map(m=>{
+    const ch = TR.foco ? chancesTreino(TR.foco, m.id) : null;
+    const info = ch ? `Progresso ~${ch.ganho}% · recuo ~${ch.perda}%${ch.lesao?` · lesão ~${ch.lesao}%`:""}` : (TR.foco ? "" : "");
+    return `<button class="b ${TR.metodo===m.id?"sel":""}" ${feito?"disabled":""} onclick="escolherMetodo('${m.id}')">${m.nome}<small>${m.desc}</small>${info?`<small class="ch">${info}</small>`:""}</button>`;
+  }).join("");
+
+  const pronto = TR.foco && TR.metodo && !feito;
+  const focoAtual = TR.foco ? FOCOS.find(f=>f.id===TR.foco) : null;
+
+  const estado = feito
+    ? `<p class="mut">Você já treinou nesta semana. Avance a semana para treinar de novo.</p>`
+    : `<p class="mut">Escolha <b>o que</b> treinar e <b>como</b> treinar. Um treino por semana.</p>`;
+
+  const resultado = res ? `
+    <div class="card" style="margin-top:0">
+      <h3>Último treino</h3>
+      <p><b>${res.foco}</b> · ${res.metodo}</p>
+      <p class="mut">${res.msg}</p>
+    </div>` : "";
+
+  return `
+    <div class="card">
+      <h3>1. O que treinar</h3>
+      <div class="btns">${focos}</div>
+    </div>
+    <div class="card">
+      <h3>2. Como treinar ${focoAtual?`· ${focoAtual.nome}`:""}</h3>
+      <div class="btns">${metodos}</div>
+      <div class="btns" style="margin-top:14px">
+        <button class="b primary" ${pronto?"":"disabled"} onclick="confirmarTreino()">Confirmar treino</button>
+      </div>
+      <div style="margin-top:10px">${estado}</div>
+    </div>
+    ${resultado}
     <div class="card"><h3>Atividades</h3>
       <div class="btns">${ATIVIDADES.map(a=>`<button class="b" onclick="atividade('${a.id}')">${a.nome}<small>${a.desc}</small></button>`).join("")}</div>
     </div>
-    <div class="card"><h3>Atributos</h3>
-      <div class="grid">${Object.entries(P.at).map(([k,v])=>statBox(k,v)).join("")}</div>
+    <div class="card"><h3>Atributos e progresso</h3>
+      <div class="grid">${Object.entries(P.at).map(([k,v])=>{
+        const need = XP_NECESSARIO(v);
+        const xp = clamp(P.xp?.[k]||0,0,need);
+        return `<div class="stat"><span class="mut">${NOME_ATRIBUTO[k]}</span><b>${v}</b>
+          <div class="bar"><i style="width:${Math.round(xp/need*100)}%"></i></div>
+          <span class="mut" style="font-size:11px">${xp}/${need} para subir</span></div>`;
+      }).join("")}</div>
     </div>`;
 }
 
@@ -829,6 +1410,7 @@ function aposentarAgora(){ if(confirm("Encerrar a carreira agora?")) aposentar()
 
 /* ---------- Inicialização ---------- */
 P = carregar();
+if(P){ P.xp = P.xp || Object.fromEntries(Object.keys(P.at).map(k=>[k,0])); }
 render();
 </script>
 </body>
