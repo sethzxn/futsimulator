@@ -147,6 +147,7 @@ const ATIVIDADES = [
   { id:"amigos", nome:"Sair com os amigos", desc:"Diversão e vínculo social", efeito:{felicidade:+6,forma:-3,rel_amigos:+4} },
   { id:"festa", nome:"Festa", desc:"Muita diversão, mas cansa", efeito:{felicidade:+10,forma:-8,estresse:-4,reputacao:+1} },
   { id:"lazer", nome:"Lazer tranquilo", desc:"Relaxar e jogar algo", efeito:{felicidade:+3,estresse:-5} },
+  { id:"fisio", nome:"Fisioterapia", desc:"Acelera a recuperação de lesões", efeito:{saude:+3,estresse:-2} },
 ];
 
 const EVENTOS = [
@@ -573,12 +574,12 @@ function criarPersonagem(){
     ultimoTreino: null, ultimoResultado: null,
     corpo: { saude:90, forma:65 },
     mente: { felicidade:60, estresse:20, disciplina:r(30,70), reputacao:10 },
-    rel: { ...origem.rel },
+    rel: { ...origem.rel, treinador: 50 },
     estudo: 0,
     vida: { dinheiro: origem.dinheiro, veiculos:[], casa:null, aluguel: origem.aluguel },
     carreira: { clube: clubeEscolhido.nome, nivel: clubeEscolhido.nivel, salario: 800, titulos: 0 },
     stats: { jogos:0, gols:0, assist:0, notas:[] },
-    flags: {}, cooldown: {}, resultados: {},
+    flags: {}, cooldown: {}, resultados: {}, noticias: [], lesao: null, cartoes: 0, suspenso: false,
     eventoAtual: null, partida: null, jogoFeito: null, ultimoJogo: null,
     historico: [], tela: "inicio",
   };
@@ -587,6 +588,7 @@ function criarPersonagem(){
   log(`${P.perfil.nome} começa na base do ${clubeEscolhido.nome} aos 14 anos.`, "evento");
   salvar(); render();
 }
+
 
 /* =========================================================
    ESTADO
@@ -623,14 +625,98 @@ function aplicar(e){
 function log(txt, tipo){ P.historico.push({t:txt, tipo:tipo||"", s:P.semana, a:P.ano}); if(P.historico.length>250) P.historico.shift(); }
 
 /* ---------- Tempo, calendário e liga ---------- */
+/* =========================================================
+   GERADOR DE EVENTOS
+   Os textos são montados por combinação de partes. Com as listas abaixo,
+   o número de frases distintas passa de milhares.
+   ========================================================= */
+const G = {
+  abertura: ["Hoje","Logo cedo","No fim da tarde","Depois do treino","No meio da semana","Em uma noite tranquila","Sem aviso","No intervalo entre um compromisso e outro","Enquanto você descansava","Quando todo mundo já tinha ido embora"],
+  sujeito: ["um colega de time","seu melhor amigo","um dos seus irmãos","um ex-companheiro da base","um jornalista da cidade","um torcedor antigo","sua mãe","seu pai","um vizinho","um empresário desconhecido","o roupeiro do clube","um fisioterapeuta do clube","a professora da escola","um primo distante","o gerente da loja do bairro"],
+  pedido: ["pediu sua ajuda","quer te encontrar","deixou um recado","mandou mensagem","te convidou","quer uma resposta rápida","precisa de um favor","te procurou com urgência","quer conversar pessoalmente","propôs algo inesperado"],
+  motivo: ["por causa de uma dívida antiga","porque ouviu falar do seu último jogo","por causa de uma discussão recente","para resolver um mal-entendido","porque precisa de dinheiro emergencialmente","porque quer voltar a falar com você","porque você é a melhor pessoa para aquilo","por um assunto da família","por uma oportunidade que surgiu de repente","sem explicar muito"],
+  consequencia: ["Isso pode mudar a semana inteira.","A decisão precisa ser tomada agora.","Você sente que tem que escolher com cuidado.","Quem está por perto percebe a tensão.","Não há tempo para pensar muito.","O resultado disso só aparece depois."],
+};
+
+// Eventos de partida: cada parte escolhe um tipo de ação do jogo.
+const PARTIDA_PARTES = {
+  ataque_sucesso: ["Você","O ponta","O meia","O volante","O centroavante"],
+  ataque_verbo: ["recebe a bola entre as linhas","cruza para a área","infiltra pelo meio","acelera pela ponta","pede a bola no pé"],
+  ataque_final: ["e o público explode","e o goleiro se atira para o lado errado","e a defesa não consegue acompanhar","e a jogada termina na rede","e o árbitro deixa a vantagem correr"],
+  defesa_verbo: ["fecha o espaço","acompanha o atacante","antecipa o passe","desarma no momento certo","se posiciona bem na área"],
+  defesa_final: ["e o ataque morre no nascedouro","e a torcida aplaude","e a bola sobra para o time respirar","e o adversário desiste da jogada","e a saída de bola começa de novo"],
+};
+
+// Eventos extras no meio do jogo, ligados à tática e aos atributos.
+const EVENTOS_PARTIDA_TIPO = [
+  { id:"contra_perigoso", peso:(pt,P)=> pt.tatica==="ofensiva" ? 3 : 1, texto:"O time avança de forma descuidada e o adversário sai no contra-ataque.", efeito:{def:-0.04, sofreChance:0.20} },
+  { id:"bloqueio_decisivo", peso:(pt,P)=> pt.tatica==="defensiva" ? 3 : 1, texto:"Você se joga na frente de um chute e bloqueia a finalização.", efeito:{def:+0.03, atq:0}, exigeAt:{defesa:55} },
+  { id:"corrida_longa", peso:(pt,P)=> P.at.velocidade>=60 ? 3 : 0.4, texto:"Você dispara em corrida longa e chega à frente do marcador.", efeito:{atq:+0.05}, exigeAt:{velocidade:60} },
+  { id:"caimbra", peso:(pt,P)=> P.corpo.forma<40 ? 3 : 0.2, texto:"Uma câimbra te obriga a diminuir o ritmo por alguns segundos.", efeito:{atq:-0.06, def:-0.03} },
+  { id:"erro_bobo", peso:(pt,P)=> P.mente.estresse>60 ? 2.5 : 0.3, texto:"Um passe sai torto por nervosismo, e a jogada se perde.", efeito:{atq:-0.05} },
+  { id:"leitura_perfeita", peso:(pt,P)=> P.at.visao>=60 ? 2.5 : 0.3, texto:"Você lê a jogada antes de todo mundo e antecipa a bola.", efeito:{atq:+0.04, def:+0.02}, exigeAt:{visao:60} },
+  { id:"reclamacao", peso:(pt,P)=> P.mente.disciplina<40 ? 2.5 : 0.4, texto:"Você reclama demais com o árbitro e leva uma advertência.", efeito:{cartao:true} },
+  { id:"torcida_empurra", peso:(pt,P)=> P.mente.reputacao>=40 ? 2 : 0.6, texto:"A torcida canta seu nome e o time sobe de produção.", efeito:{atq:+0.03} },
+  { id:"lance_salvo", peso:(pt,P)=> P.corpo.forma>=70 ? 2 : 0.6, texto:"Você se recupera rápido de um tropeço e segue no lance.", efeito:{def:+0.02} },
+  { id:"falha_coletiva", peso:(pt,P)=> pt.tatica==="equilibrada" ? 1.5 : 0.6, texto:"Uma falha de comunicação no setor deixa espaço para o adversário.", efeito:{def:-0.04, sofreChance:0.15} },
+  { id:"substituicao_tatica", peso:(pt,P)=> 0.5, texto:"O treinador faz sinal para mudar a postura do time.", efeito:{atq:+0.02, def:+0.02} },
+  { id:"gol_bobo", peso:(pt,P)=> P.mente.felicidade>=70 ? 1.5 : 0.4, texto:"Você ri de uma jogada boba com um colega, e o clima melhora no campo.", efeito:{atq:+0.02} },
+];
+
+function gerarFraseDoLance(acao, acerto){
+  const quem = pick(PARTIDA_PARTES.ataque_sucesso);
+  if(acerto){
+    return `${quem} ${pick(PARTIDA_PARTES.ataque_verbo)} ${pick(PARTIDA_PARTES.ataque_final)}.`;
+  }
+  return `${quem} ${pick(PARTIDA_PARTES.defesa_verbo)}, ${pick(PARTIDA_PARTES.defesa_final)}.`;
+}
+
+// Eventos de vida procedurais: milhares de combinações de quem, o que pede e o que você decide.
+const DECISOES_VIDA = [
+  {t:"Ajudar", efeito:{rel_familia:+4,dinheiro:-200,estresse:+2}},
+  {t:"Ouvir e pensar depois", efeito:{estresse:+1,felicidade:+1}},
+  {t:"Recusar com educação", efeito:{rel_amigos:-2,felicidade:-1}},
+  {t:"Pedir um tempo", efeito:{estresse:-1}},
+  {t:"Dar uma resposta firme", efeito:{reputacao:+2,estresse:+3}},
+  {t:"Ignorar", efeito:{rel_amigos:-3,estresse:+2}},
+];
+function eventoVidaProcedural(){
+  const s = pick(G.sujeito);
+  const titulo = `${s[0].toUpperCase()+s.slice(1)} ${pick(G.pedido)}`;
+  const texto = `${pick(G.abertura)}, ${s} ${pick(G.pedido)} ${pick(G.motivo)}. ${pick(G.consequencia)}`;
+  const escolhas = shuffle(DECISOES_VIDA).slice(0,3);
+  return {
+    id:"proc_"+Math.random().toString(36).slice(2,8), peso:0, procedural:true,
+    titulo, texto,
+    opcoes: escolhas.map(d=>({t:d.t, efeito:d.efeito, log:`${d.t}: ${titulo.toLowerCase()}.`})),
+  };
+}
+
+// Calcula eventos extras de partida conforme tática, atributos e situação.
+function eventoExtraDePartida(pt){
+  const cand = EVENTOS_PARTIDA_TIPO.filter(e=>{
+    if(e.exigeAt){ const [k,v] = Object.entries(e.exigeAt)[0]; return (P.at[k]??0) >= v; }
+    return true;
+  });
+  const pesos = cand.map(e=>{ try{ return Math.max(0, e.peso(pt,P)); }catch{ return 0; } });
+  const total = pesos.reduce((a,b)=>a+b,0);
+  if(total<=0 || Math.random() > 0.35) return null;
+  let x = Math.random()*total;
+  for(let i=0;i<cand.length;i++){ x-=pesos[i]; if(x<=0) return cand[i]; }
+  return null;
+}
+
+/* ---------- Tempo, calendário e liga ---------- */
 const CLUBES_LIGA = ["Valmont FC","Alvorada Atlético","Serrano Esporte Clube","Rio Azul FC","Porto Verde","Monte Alto FC","Cidade Nova EC","União Sul FC"];
 const TEMPORADA_RODADAS = 14;
-const DIA_JOGO = 6;            // sábado
-const CHANCE_EVENTO_DIA = 0.10;
-const COOLDOWN_EVENTO = 120;    // dias até um evento poder se repetir
+const DIA_JOGO = 6;
+const CHANCE_EVENTO_DIA = 0.2;
+const CHANCE_NOTICIA_DIA = 0.6;
+const COOLDOWN_EVENTO = 90;
+
+const shuffle = a => { const b=[...a]; for(let i=b.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [b[i],b[j]]=[b[j],b[i]]; } return b; };
 
 function gerarCalendario(times){
-  // método do círculo: 8 times -> 7 rodadas de ida, espelhadas na volta (14 rodadas)
   const n = times.length;
   const fixo = times[0];
   let rot = times.slice(1);
@@ -682,7 +768,6 @@ function aplicarResultadoTabela(a, ga, b, gb){
   else if(ga<gb){ tb.v++; tb.pts+=3; ta.d++; }
   else { ta.e++; tb.e++; ta.pts++; tb.pts++; }
 }
-
 function poisson(l){ const L=Math.exp(-l); let k=0, p=1; do{ k++; p*=Math.random(); }while(p>L); return k-1; }
 function simularPlacar(fa, fb){
   const lam = x => Math.max(0.3, 1.1 + (x-50)/40);
@@ -696,7 +781,7 @@ function simularOutrosJogos(rodada){
   });
 }
 
-/* ---------- Partida: pré-jogo e lances com decisões ---------- */
+/* ---------- Partida ---------- */
 const TATICAS = [
   {id:"ofensiva", nome:"Ofensiva", desc:"Mais ataques, mas o contra-ataque do adversário fica mais perigoso.", atq:+0.06, def:-0.06},
   {id:"equilibrada", nome:"Equilibrada", desc:"Sem exageros, de olho nos dois lados.", atq:0, def:0},
@@ -705,66 +790,135 @@ const TATICAS = [
 const INSTRUCOES = [
   {id:"gol", nome:"Procurar o gol", desc:"Você busca a finalização sempre que puder.", atq:+0.05, pas:0},
   {id:"equipe", nome:"Ajudar a equipe", desc:"Você prioriza o passe para os companheiros.", atq:0, pas:+0.07},
-  {id:"calma", nome:"Jogar com calma", desc:"Menos risco, menos brilho.", atq:-0.02, pas:+0.02},
+  {id:"calma", nome:"Jogar com calma", desc:"Menos risco, menos brilho.", atq:-0.02, pas:+0.02, risco:-0.02},
+];
+const PALESTRAS = [
+  {id:"motivar", nome:"Motivar o time", desc:"Confiança alta, o time sobe de produção.", atq:+0.04, def:0, treinador:+2, felic:+3},
+  {id:"cobrar", nome:"Cobrar atitude", desc:"Pressão alta. Pode render, mas irrita o grupo.", atq:+0.02, def:+0.02, treinador:-2, estresse:+4},
+  {id:"ajustar", nome:"Ajustar a marcação", desc:"Corrige falhas e fecha os espaços.", atq:0, def:+0.05, treinador:+1},
 ];
 
-const LANCES = [
-  { tipo:"ataque", titulo:"Ataque pela direita", texto:"Você recebe a bola no meio-campo com espaço à frente.",
+const CLIMAS = [
+  {id:"normal", nome:"Tempo bom", atq:0, pas:0, fin:0},
+  {id:"chuva", nome:"Chuva forte", atq:-0.02, pas:-0.05, fin:-0.03},
+  {id:"calor", nome:"Calor intenso", atq:-0.01, pas:0, fin:0, forma:2},
+  {id:"vento", nome:"Vento forte", atq:0, pas:-0.02, fin:-0.04},
+];
+const ARBITRAGENS = [
+  {id:"rigida", nome:"Árbitro rígido", cartao:0.35},
+  {id:"normal", nome:"Árbitro normal", cartao:0.15},
+  {id:"frouxa", nome:"Árbitro frouxo", cartao:0.05},
+];
+
+// Lances: cada partida sorteia alguns deste pool, então o jogo muda de um para outro.
+const LANCES_POOL = [
+  { id:"ataque_dir", tipo:"ataque", titulo:"Ataque pela direita", texto:"O ponta vem em velocidade e você recebe a bola no meio.",
     opcoes:[
       {t:"Chutar de fora", attr:"finalizacao", base:0.38, acao:"chute"},
       {t:"Tocar para o ponta", attr:"passe", base:0.50, acao:"passe"},
-      {t:"Driblar para a área", attr:"drible", base:0.38, acao:"drible"},
-      {t:"Segurar a bola", attr:"visao", base:0.90, acao:"segura"},
-    ]},
-  { tipo:"defesa", titulo:"Contra-ataque adversário", texto:"O adversário sai em velocidade e chega perto da sua área.",
+      {t:"Driblar para a área", attr:"drible", base:0.40, acao:"drible", risco:true},
+      {t:"Segurar a bola", attr:"visao", base:0.90, acao:"segura"} ]},
+  { id:"ataque_esq", tipo:"ataque", titulo:"Ataque pela esquerda", texto:"A jogada cresce pela ponta esquerda e a defesa se abre.",
     opcoes:[
-      {t:"Marcar o atacante", attr:"defesa", base:0.55, acao:"marca"},
-      {t:"Pressionar alto", attr:"velocidade", base:0.42, acao:"pressao"},
-      {t:"Recuar e fechar", attr:"resistencia", base:0.70, acao:"recua"},
-    ]},
-  { tipo:"parada", titulo:"Falta perto da área", texto:"Falta a 25 metros. A barreira está montada.",
+      {t:"Cruzar na área", attr:"passe", base:0.45, acao:"passe"},
+      {t:"Entrar em diagonal", attr:"drible", base:0.40, acao:"drible", risco:true},
+      {t:"Finalizar cedo", attr:"finalizacao", base:0.32, acao:"chute"} ]},
+  { id:"chance_clara", tipo:"ataque", titulo:"Chance clara", texto:"Você fica sozinho de frente para o gol, com o zagueiro chegando.",
+    opcoes:[
+      {t:"Finalizar rasteiro", attr:"finalizacao", base:0.50, acao:"chute"},
+      {t:"Tocar para o companheiro livre", attr:"passe", base:0.55, acao:"passe"},
+      {t:"Cabecear no meio", attr:"velocidade", base:0.40, acao:"cabeca"} ]},
+  { id:"area", tipo:"ataque", titulo:"Bola na área", texto:"A bola sobra dentro da área depois de um rebote.",
+    opcoes:[
+      {t:"Chutar na hora", attr:"finalizacao", base:0.40, acao:"chute"},
+      {t:"Dominar antes de chutar", attr:"drible", base:0.45, acao:"drible", risco:true} ]},
+  { id:"falta", tipo:"parada", titulo:"Falta perto da área", texto:"Falta a 25 metros. A barreira está montada.",
     opcoes:[
       {t:"Bater direto", attr:"finalizacao", base:0.25, acao:"chute"},
       {t:"Tocar para um colega", attr:"passe", base:0.55, acao:"passe"},
-      {t:"Cabecear na área", attr:"velocidade", base:0.35, acao:"chute"},
-    ]},
-  { tipo:"fim", titulo:"Reta final", texto:"Faltam poucos minutos. O que você faz com o time?",
+      {t:"Cabecear na área", attr:"velocidade", base:0.35, acao:"cabeca"} ]},
+  { id:"escanteio", tipo:"parada", titulo:"Escanteio", texto:"A bola está pronta na bandeirinha. A área está cheia.",
+    opcoes:[
+      {t:"Cabecear no primeiro pau", attr:"velocidade", base:0.36, acao:"cabeca"},
+      {t:"Cobrar rasteiro curto", attr:"passe", base:0.52, acao:"passe"} ]},
+  { id:"contra", tipo:"defesa", titulo:"Contra-ataque adversário", texto:"O adversário sai em velocidade e chega perto da sua área.",
+    opcoes:[
+      {t:"Marcar o atacante", attr:"defesa", base:0.55, acao:"marca", risco:true},
+      {t:"Pressionar alto", attr:"velocidade", base:0.42, acao:"pressao", risco:true},
+      {t:"Recuar e fechar", attr:"resistencia", base:0.70, acao:"recua"} ]},
+  { id:"pressao", tipo:"defesa", titulo:"Pressão adversária", texto:"O meio-campo adversário aperta e a saída de bola fica difícil.",
+    opcoes:[
+      {t:"Sair driblando", attr:"drible", base:0.40, acao:"drible", risco:true},
+      {t:"Devolver a bola para trás", attr:"visao", base:0.75, acao:"segura"},
+      {t:"Pedir ajuda ao volante", attr:"passe", base:0.60, acao:"passe"} ]},
+  { id:"entrada", tipo:"defesa", titulo:"Entrada forte do adversário", texto:"O zagueiro adversário chega duro na sua canela. O árbitro observa.",
+    opcoes:[
+      {t:"Reclamar com o árbitro", attr:"visao", base:0.45, acao:"reclama"},
+      {t:"Levantar e seguir jogando", attr:"resistencia", base:0.85, acao:"segura"} ]},
+  { id:"reta", tipo:"fim", titulo:"Reta final", texto:"Faltam poucos minutos. O que você faz com o time?",
     opcoes:[
       {t:"Atacar até o fim", attr:"resistencia", base:0.50, acao:"fim_ataque"},
-      {t:"Segurar o resultado", attr:"defesa", base:0.65, acao:"fim_defesa"},
-    ]},
+      {t:"Segurar o resultado", attr:"defesa", base:0.65, acao:"fim_defesa"} ]},
 ];
 
 const TEXTOS = {
-  gol_chute:["Golaço de fora da área! A bola entra no canto.","Chute forte, sem chance para o goleiro. Gol!"],
-  defendido:["O goleiro faz a defesa com as mãos.","Chute forte, mas para o goleiro."],
-  erro_chute:["A bola sai pela linha de fundo.","Chute alto, para fora."],
-  passe_ok:["O passe chega certinho ao ponta.","Passe quebra-linhas, o time avança."],
-  passe_gol:["O ponta finaliza e marca! Você deu a assistência."],
-  passe_erro:["O passe é interceptado no meio."],
-  drible_ok:["Você passa por dois marcadores.","Drible limpo, o time ganha campo."],
-  drible_gol:["Depois do drible, você finaliza e marca!"],
-  drible_erro:["O zagueiro toma a bola no pé."],
-  segura_ok:["Você segura a bola e o tempo passa."],
-  marca_ok:["Você acompanha o atacante e desarma."],
-  marca_erro:["O atacante passa pela sua marcação."],
-  pressao_ok:["A pressão faz o adversário errar."],
-  pressao_erro:["Você chega tarde e sai falta."],
-  recua_ok:["Você fecha o espaço e a jogada morre."],
-  recua_erro:["Você recua demais e o adversário chega livre."],
-  fim_ataque_gol:["Nos minutos finais, o time marca!"],
-  fim_ataque_erro:["O ataque insiste, mas a bola não entra."],
-  fim_defesa_ok:["O time segura o resultado até o apito."],
-  fim_defesa_erro:["Uma falha no fim do jogo, e o adversário chega."],
-  contra_gol:["O adversário marca no contra-ataque."],
+  chute_gol:["Golaço de fora da área! A bola entra no canto.","Chute forte, sem chance para o goleiro. Gol!","Finalização cruzada, e a bola morre no fundo da rede."],
+  chute_defendido:["O goleiro faz a defesa com as mãos.","Chute forte, mas para o goleiro.","Bem colocado, mas o goleiro voa para salvar."],
+  chute_erro:["A bola sai pela linha de fundo.","Chute alto, para fora.","Você mandou no meio do gol e perdeu a chance."],
+  passe_ok:["O passe chega certinho ao ponta.","Passe quebra-linhas, o time avança.","Você acha o espaço e o companheiro recebe livre."],
+  passe_gol:["O companheiro finaliza e marca! Você deu a assistência.","Passe de calcanhar, e o colega chuta para o gol. Assistência sua!"],
+  passe_erro:["O passe é interceptado no meio.","Passe longo demais, a bola sai.","O defensor corta antes de chegar ao destino."],
+  drible_ok:["Você passa por dois marcadores.","Drible limpo, o time ganha campo.","Você deixa o lateral para trás e chega na linha."],
+  drible_gol:["Depois do drible, você finaliza e marca!","Você entra na área, passa pelo goleiro e marca."],
+  drible_erro:["O zagueiro toma a bola no pé.","Você tenta o drible, mas perde a bola.","O marcador encaixa e rouba a bola."],
+  cabeca_gol:["Cabeçada certeira! A bola entra.","Você sobe mais que todo mundo e marca de cabeça!"],
+  cabeca_defendido:["O goleiro espalma a cabeçada.","A bola sai na cabeçada, mas o goleiro salva."],
+  cabeca_erro:["A cabeçada sai por cima do travessão.","Você sobe, mas não acerta a bola."],
+  segura_ok:["Você segura a bola e o tempo passa.","A jogada volta para trás, e o time respira."],
+  marca_ok:["Você acompanha o atacante e desarma.","Boa marcação, o atacante não passa."],
+  marca_erro:["O atacante passa pela sua marcação.","Você escorrega e o atacante avança."],
+  pressao_ok:["A pressão faz o adversário errar.","O adversário perde a bola na saída."],
+  pressao_erro:["Você chega tarde e o adversário passa.","A pressão deixa espaço nas costas."],
+  recua_ok:["Você fecha o espaço e a jogada morre.","Recuo certo: o adversário não tem onde chegar."],
+  recua_erro:["Você recua demais e o adversário chega livre.","O atacante se aproveita do espaço que sobrou."],
+  reclama_ok:["O árbitro mostra o cartão amarelo para o adversário!","Sua reclamação dá resultado e o adversário é advertido."],
+  reclama_erro:["O árbitro ignora e a jogada continua.","Você reclama, mas o árbitro não muda nada."],
+  fim_ataque_gol:["Nos minutos finais, o time marca!","Pressão total, e a bola entra no último minuto."],
+  fim_ataque_erro:["O ataque insiste, mas a bola não entra.","O time avança, mas a defesa segura."],
+  fim_defesa_ok:["O time segura o resultado até o apito.","A defesa fecha tudo nos minutos finais."],
+  fim_defesa_erro:["Uma falha no fim do jogo, e o adversário chega.","O cansaço pesa e a defesa abre espaço."],
+  segura_ok_extra:["O torcedor aplaude a calma com a bola."],
+  contra_gol:["O adversário marca no contra-ataque.","Falha coletiva, e o adversário aproveita para marcar.","Gol do adversário, depois de um erro de saída."],
+  cartao:["O árbitro mostra o cartão amarelo para você.","Entrada dura, e você recebe o amarelo."],
+  lesao:["Você sente o músculo e cai no gramado. O departamento médico entra em campo.","Uma torção feia, e você precisa sair de campo."],
+  torcida:["A torcida canta seu nome e empurra o time.","Um clima de final de campeonato toma conta do estádio."],
+  anulado:["O VAR anula o gol por impedimento.","Gol anulado depois de revisão, a torcida protesta."],
+  chance_perdida:["O goleiro adversário faz uma defesa milagrosa!","Você teve a chance, mas a bola bateu na trave."],
 };
 const pickTxt = k => pick(TEXTOS[k] || ["..."]);
+
+function escolherLancesDaPartida(titular){
+  const pool = shuffle(LANCES_POOL.filter(l=>l.tipo!=="fim"));
+  const quantidade = titular ? 5 : 3;
+  const fim = LANCES_POOL.find(l=>l.id==="reta");
+  return [...pool.slice(0,quantidade), fim];
+}
 
 function iniciarPartida(){
   const jogo = jogoDeHoje();
   if(!jogo || P.jogoFeito===chaveSemana()) return;
   const adv = jogo[0]===P.carreira.clube ? jogo[1] : jogo[0];
-  P.partida = { rodada:P.semana, adv, mandante: jogo[0]===P.carreira.clube, fase:"pre", tatica:null, instrucao:null, lance:0, gP:0, gA:0, gJ:0, asJ:0, log:[] };
+  const titular = Math.random() < clamp(0.45 + (P.rel.treinador-50)/200 + (P.corpo.forma-50)/300 + (P.mente.reputacao-10)/400, 0.15, 0.9);
+  const pt = {
+    rodada: P.semana, adv, mandante: jogo[0]===P.carreira.clube,
+    fase:"pre", tatica:null, instrucao:null,
+    clima: pick(CLIMAS), arbitragem: pick(ARBITRAGENS), titular,
+    lancesDoJogo: escolherLancesDaPartida(titular),
+    lance:0, palestraFeita:false, bonusAtq:0, bonusDef:0,
+    gP:0, gA:0, gJ:0, asJ:0, cartoesJog:0, lesionouJog:false, log:[],
+  };
+  pt.intervalo = Math.floor(pt.lancesDoJogo.length/2);
+  P.partida = pt;
   salvar(); render();
 }
 function escolherTatica(id){ P.partida.tatica = id; salvar(); render(); }
@@ -776,36 +930,55 @@ function comecarJogo(){
   salvar(); render();
 }
 
+function resolverPalestra(i){
+  const pt = P.partida; const p = PALESTRAS[i];
+  pt.bonusAtq += p.atq; pt.bonusDef += p.def; pt.palestraFeita = true;
+  P.rel.treinador = clamp(P.rel.treinador + (p.treinador||0), 0, 100);
+  if(p.felic) P.mente.felicidade = clamp(P.mente.felicidade + p.felic, 0, 100);
+  if(p.estresse) P.mente.estresse = clamp(P.mente.estresse + p.estresse, 0, 100);
+  pt.log.push({titulo:"Intervalo", escolha:p.nome, texto:`Você fez uma palestra: ${p.nome.toLowerCase()}.`, placar:[pt.gP,pt.gA]});
+  pt.fase = "jogo";
+  salvar(); render();
+}
+
 function resolverLance(i){
   const pt = P.partida;
-  const lance = LANCES[pt.lance];
+  const lance = pt.lancesDoJogo[pt.lance];
   const op = lance.opcoes[i];
   const tat = TATICAS.find(t=>t.id===pt.tatica);
   const ins = INSTRUCOES.find(x=>x.id===pt.instrucao);
+  const cli = pt.clima;
   const at = P.at[op.attr] ?? 50;
   const forma = (P.corpo.forma-50)*0.002;
   const estresse = -(P.mente.estresse-30)*0.0015;
   const ataque = lance.tipo==="ataque" || lance.tipo==="parada";
+  const comEquipe = pt.titular ? 0 : -0.02;
 
-  let p = op.base + (at-50)*0.006 + forma + estresse;
-  if(ataque) p += tat.atq + ins.atq;
-  if(lance.tipo==="defesa") p += tat.def;
-  if(op.acao==="passe") p += ins.pas;
+  let p = op.base + (at-50)*0.006 + forma + estresse + comEquipe;
+  if(ataque) p += tat.atq + ins.atq + pt.bonusAtq + cli.atq;
+  if(lance.tipo==="defesa") p += tat.def + pt.bonusDef;
+  if(op.acao==="passe") p += ins.pas + cli.pas;
+  if(op.acao==="chute" || op.acao==="cabeca") p += cli.fin;
   if(op.acao==="segura") p = 0.95;
   p = clamp(p, 0.05, 0.92);
   const acerto = Math.random() < p;
 
   const forcaAdv = forcaTime(pt.adv);
-  const pContra = clamp(0.16 + (forcaAdv-50)/200 + (tat.def<0?0.03:0) - tat.def*0.5, 0.05, 0.6);
+  const pContra = clamp(0.16 + (forcaAdv-50)/200 + (tat.def<0?0.03:0) - tat.def*0.5 - pt.bonusDef, 0.05, 0.6);
 
-  let texto = "", gol=false, golJ=false, asst=false, contra=false;
+  let texto = "", gol=false, golJ=false, asst=false, contra=false, cartao=false, lesao=false, extra=null;
 
   if(ataque){
     if(op.acao==="chute"){
       if(acerto){
-        if(Math.random() < 0.55 + (at-50)/200){ gol=true; golJ=true; texto=pickTxt("gol_chute"); }
-        else texto=pickTxt("defendido");
-      } else texto=pickTxt("erro_chute");
+        if(Math.random() < 0.55 + (at-50)/200){ gol=true; golJ=true; texto=pickTxt("chute_gol"); }
+        else texto=pickTxt("chute_defendido");
+      } else texto=pickTxt("chute_erro");
+    } else if(op.acao==="cabeca"){
+      if(acerto){
+        if(Math.random() < 0.5){ gol=true; golJ=true; texto=pickTxt("cabeca_gol"); }
+        else texto=pickTxt("cabeca_defendido");
+      } else texto=pickTxt("cabeca_erro");
     } else if(op.acao==="passe"){
       if(acerto){
         if(Math.random()<0.42){ gol=true; asst=true; texto=pickTxt("passe_gol"); }
@@ -821,8 +994,15 @@ function resolverLance(i){
     }
     if(!acerto && op.acao!=="segura") contra = Math.random()<pContra;
   } else if(lance.tipo==="defesa"){
-    if(acerto) texto = pickTxt(op.acao+"_ok");
-    else { texto = pickTxt(op.acao+"_erro"); contra = Math.random() < pContra + 0.15; }
+    if(op.acao==="reclama"){
+      if(acerto){ texto=pickTxt("reclama_ok"); cartao=true; } else texto=pickTxt("reclama_erro");
+    } else if(acerto){
+      texto = pickTxt(op.acao+"_ok");
+    } else {
+      texto = pickTxt(op.acao+"_erro");
+      contra = Math.random() < pContra + 0.15;
+      if(op.acao==="marca" || op.acao==="pressao"){ cartao = Math.random() < pt.arbitragem.cartao * (1 + (60-P.mente.disciplina)/100 + (P.mente.estresse-40)/150); }
+    }
   } else {
     if(op.acao==="fim_ataque"){
       if(Math.random() < (acerto?0.32:0.12)){ gol=true; texto=pickTxt("fim_ataque_gol"); }
@@ -834,15 +1014,48 @@ function resolverLance(i){
     }
   }
 
+  // Risco de lesão em ações de contato.
+  // Lesão: mais provável com forma baixa, estresse alto e ações de contato.
+  const riscoLesao = 0.04 * (1 + clamp((55-P.corpo.forma)/60,0,1.5) + clamp((P.mente.estresse-50)/80,0,1));
+  if(op.risco && !acerto && Math.random() < riscoLesao){ lesao = true; }
+  // Eventos extras aleatórios dentro do jogo.
+  const sorte = Math.random();
+  if(!lesao && sorte < 0.10){ extra = "torcida"; }
+  else if(!lesao && sorte < 0.16 && gol){ extra = "anulado"; }
+  else if(!lesao && sorte < 0.20 && !gol){ extra = "chance_perdida"; }
+  // Evento extra de partida: depende da tática, dos atributos e da forma/estresse.
+  const evExtra = !lesao ? eventoExtraDePartida(pt) : null;
+  if(evExtra){
+    texto += " " + evExtra.texto;
+    if(evExtra.efeito.atq) pt.bonusAtq += evExtra.efeito.atq;
+    if(evExtra.efeito.def) pt.bonusDef += evExtra.efeito.def;
+    if(evExtra.efeito.cartao) pt.cartoesJog++;
+    if(evExtra.efeito.sofreChance && Math.random() < evExtra.efeito.sofreChance) contra = true;
+    pt.bonusAtq = clamp(pt.bonusAtq, -0.15, 0.15);
+    pt.bonusDef = clamp(pt.bonusDef, -0.15, 0.15);
+  }
+  // Comentário gerado: frase montada a partir de combinações, para cada lance ser diferente.
+  if(Math.random() < 0.5) texto += " " + gerarFraseDoLance(op.acao, acerto);
+
+  if(gol && extra==="anulado"){ gol=false; golJ=false; asst=false; texto = pickTxt("anulado"); }
+  if(extra==="torcida") texto += " " + pickTxt("torcida");
+  if(extra==="chance_perdida") texto += " " + pickTxt("chance_perdida");
+
   if(gol) pt.gP++;
   if(golJ) pt.gJ++;
   if(asst) pt.asJ++;
   if(contra){ pt.gA++; texto += " " + pickTxt("contra_gol"); }
+  if(cartao){ texto += " " + pickTxt("cartao"); pt.cartoesJog++; }
+  if(lesao){
+    texto += " " + pickTxt("lesao");
+    pt.lesionouJog = true;
+  }
   pt.log.push({ titulo:lance.titulo, escolha:op.t, texto, placar:[pt.gP,pt.gA], marcou:gol, sofreu:contra });
 
   pt.lance++;
-  if(pt.lance >= LANCES.length) finalizarPartida();
-  else { salvar(); render(); }
+  if(pt.lesionouJog || pt.lance >= pt.lancesDoJogo.length){ finalizarPartida(); return; }
+  if(pt.lance === pt.intervalo && !pt.palestraFeita){ pt.fase = "intervalo"; }
+  salvar(); render();
 }
 
 function finalizarPartida(){
@@ -851,25 +1064,56 @@ function finalizarPartida(){
   aplicarResultadoTabela(P.carreira.clube, pt.gP, pt.adv, pt.gA);
   simularOutrosJogos(pt.rodada);
 
-  const nota = clamp(6 + pt.gJ*1.2 + pt.asJ*0.8 - pt.gA*0.3 + (P.corpo.forma-50)/60 + (Math.random()-0.5), 3, 10);
+  const nota = clamp(6 + pt.gJ*1.2 + pt.asJ*0.8 - pt.gA*0.3 + (P.corpo.forma-50)/60 + (Math.random()-0.5) - pt.cartoesJog*0.4, 3, 10);
   P.stats.jogos++; P.stats.gols += pt.gJ; P.stats.assist += pt.asJ; P.stats.notas.push(Number(nota.toFixed(1)));
+  P.stats.cartoes = (P.stats.cartoes||0) + pt.cartoesJog;
   if(res==="V"){ P.vida.dinheiro += 400; P.mente.reputacao = clamp(P.mente.reputacao+1,0,100); P.mente.felicidade = clamp(P.mente.felicidade+6,0,100); }
   else if(res==="E"){ P.vida.dinheiro += 150; }
   else { P.mente.reputacao = clamp(P.mente.reputacao-1,0,100); P.mente.felicidade = clamp(P.mente.felicidade-4,0,100); }
   P.corpo.forma = clamp(P.corpo.forma-6,0,100);
   P.mente.estresse = clamp(P.mente.estresse + (res==="V"?-2:5),0,100);
 
+  P.cartoes = (P.cartoes||0) + pt.cartoesJog;
+  if(P.cartoes >= 2){ P.suspenso = true; P.cartoes = 0; log("Você recebeu dois amarelos e fica suspenso no próximo jogo.", "jogo"); }
+
+  if(pt.lesionouJog){
+    const dias = r(7,28);
+    P.lesao = { dias, tipo: pick(["músculo da coxa","tornozelo","joelho","panturrilha"]) };
+    P.corpo.saude = clamp(P.corpo.saude-10,0,100);
+    log(`Lesão: ${P.lesao.tipo}. Previsão de ${dias} dias fora.`, "lesao");
+  }
+
   P.resultados = P.resultados || {};
   P.resultados[pt.rodada] = `${pt.gP}x${pt.gA}`;
-  P.ultimoJogo = { adv:pt.adv, placar:[pt.gP,pt.gA], res, nota:nota.toFixed(1), gj:pt.gJ, asj:pt.asJ };
+  P.ultimoJogo = { adv:pt.adv, placar:[pt.gP,pt.gA], res, nota:nota.toFixed(1), gj:pt.gJ, asj:pt.asJ, clima:pt.clima.nome, arbitragem:pt.arbitragem.nome, lesao: pt.lesionouJog, log: pt.log };
   log(`Partida vs ${pt.adv}: ${pt.gP}x${pt.gA}. Nota ${nota.toFixed(1)}.`, "jogo");
   P.jogoFeito = chaveSemana();
   P.partida = null;
   salvar(); render();
 }
 
+// Jogo sem o jogador (lesionado ou suspenso): o time joga e o resultado sai pela força dos times.
+function jogarSemJogador(){
+  const jogo = jogoDeHoje();
+  if(!jogo || P.jogoFeito===chaveSemana()) return;
+  const adv = jogo[0]===P.carreira.clube ? jogo[1] : jogo[0];
+  const [gP,gA] = simularPlacar(forcaTime(P.carreira.clube), forcaTime(adv));
+  aplicarResultadoTabela(P.carreira.clube, gP, adv, gA);
+  simularOutrosJogos(P.semana);
+  const motivo = P.lesao ? `lesionado (${P.lesao.dias} dias)` : "suspenso";
+  if(P.suspenso) P.suspenso = false;
+  P.resultados = P.resultados || {};
+  P.resultados[P.semana] = `${gP}x${gA}`;
+  P.ultimoJogo = { adv, placar:[gP,gA], res: gP>gA?"V":gP<gA?"D":"E", nota:"–", gj:0, asj:0, clima:"–", arbitragem:"–", lesao:false, log:[{titulo:"Fora de campo", escolha:"", texto:`Você ficou de fora (${motivo}) e acompanhou o jogo.`, placar:[gP,gA]}] };
+  log(`Você ficou fora (${motivo}). O time jogou contra ${adv}: ${gP}x${gA}.`, "jogo");
+  P.jogoFeito = chaveSemana();
+  salvar(); render();
+}
+
 /* ---------- Eventos ---------- */
 function sortearEvento(){
+  // Metade das vezes, um evento montado pelo gerador (milhares de combinações).
+  if(Math.random() < 0.5) return eventoVidaProcedural();
   P.cooldown = P.cooldown || {};
   const elegiveis = EVENTOS.filter(ev => {
     const ultimo = P.cooldown[ev.id];
@@ -887,11 +1131,44 @@ function resolverEventoAtual(i){
   const op = ev.opcoes[i];
   aplicar(op.efeito);
   if(op.sorte){ aplicar({dinheiro: Math.random()<op.sorte.p ? op.sorte.ganho : op.sorte.perda}); }
+  if(op.fx) op.fx();
   if(op.flag) P.flags[op.flag] = true;
   if(op.chance && Math.random()<op.chance.p) P.flags[op.chance.flag] = true;
   log(op.log || op.t, "evento");
   P.eventoAtual = null;
   salvar(); render();
+}
+
+/* ---------- Notícias ---------- */
+const NOTICIAS = [
+  {t:"Rumores de que um clube grande está de olho em um jogador da base.", fx:{reputacao:+1}},
+  {t:"Previsão de chuva forte para o fim de semana.", fx:{}},
+  {t:"Um ex-jogador do clube elogia a sua evolução nas redes sociais.", fx:{reputacao:+2}},
+  {t:"Torcedores fazem fila para o treino aberto da semana.", fx:{felicidade:+2}},
+  {t:"Boatos de mudança na comissão técnica circulam na imprensa.", fx:{estresse:+2}},
+  {t:"Um patrocinador anunciou uma parceria com a categoria de base.", fx:{}},
+  {t:"Novo estudo mostra que descanso aumenta o rendimento em partidas.", fx:{forma:+2}},
+  {t:"Jornalista esportivo critica a defesa da equipe na última rodada.", fx:{estresse:+3}},
+  {t:"Vídeo de um drible seu viraliza, mas ninguém sabe a origem.", fx:{reputacao:+3}},
+  {t:"Clube vizinho anuncia contratação de um lateral da base.", fx:{}},
+  {t:"Torneio de categorias de base confirma data para o mês que vem.", fx:{}},
+  {t:"Cantina do estádio ganha prêmio de melhor comida da cidade.", fx:{felicidade:+1}},
+  {t:"Árbitro é suspenso por erro em jogo da semana passada.", fx:{}},
+  {t:"Previsão de calor forte para os próximos jogos.", fx:{}},
+  {t:"Alguém postou uma foto antiga sua de criança com a camisa do clube.", fx:{felicidade:+2}},
+  {t:"Empresário anuncia interesse em conversar com você.", fx:{reputacao:+2,estresse:+2}},
+  {t:"Um repórter pede entrevista exclusiva sobre a sua carreira.", fx:{reputacao:+1}},
+  {t:"Ingressos esgotam para o clássico da próxima rodada.", fx:{}},
+  {t:"Pesquisa aponta que o público mais jovem acompanha o clube pelas redes.", fx:{}},
+  {t:"Clube anuncia novo uniforme de treino.", fx:{}},
+];
+function geraNoticiaDoDia(){
+  if(Math.random() > CHANCE_NOTICIA_DIA) return;
+  const n = pick(NOTICIAS);
+  P.noticias = P.noticias || [];
+  P.noticias.unshift({ t:n.t, dia:P.diaAbs, semana:P.semana, ano:P.ano });
+  if(P.noticias.length>40) P.noticias.pop();
+  aplicar(n.fx);
 }
 
 /* ---------- Compras ---------- */
@@ -911,7 +1188,7 @@ function comprar(tipo, id){
   salvar(); render();
 }
 
-/* ---------- Atividades (uma por dia) e semana ---------- */
+/* ---------- Atividades e semana ---------- */
 function atividade(id){
   if(P.diaAtividade === P.diaAbs) return;
   const a = ATIVIDADES.find(x=>x.id===id);
@@ -919,6 +1196,7 @@ function atividade(id){
   if(e.rel_familia){ P.rel.familia = clamp(P.rel.familia+e.rel_familia,0,100); delete e.rel_familia; }
   if(e.rel_amigos){ P.rel.amigos = clamp(P.rel.amigos+e.rel_amigos,0,100); delete e.rel_amigos; }
   aplicar(e);
+  if(id==="fisio" && P.lesao){ P.lesao.dias = Math.max(1, P.lesao.dias-2); }
   P.diaAtividade = P.diaAbs;
   log(`${a.nome}: ${a.desc}`, "atividade");
   salvar(); render();
@@ -946,13 +1224,29 @@ function fecharTemporada(){
   const pos = tab.findIndex(t=>t.nome===P.carreira.clube)+1;
   if(pos===1){ P.carreira.titulos++; P.vida.dinheiro += 2000; P.mente.reputacao = clamp(P.mente.reputacao+5,0,100); log(`Campeão da temporada ${P.liga.temporada}!`, "conquista"); }
   else log(`Terminou a temporada ${P.liga.temporada} em ${pos}º lugar.`, "evento");
+  // renovação de contrato: a proposta depende do desempenho
+  const ganhoBase = pos<=3 ? 0.3 : pos<=6 ? 0.15 : 0.05;
+  P.eventoAtual = {
+    id:"renovacao", titulo:"Renovação de contrato",
+    texto:`O clube quer renovar seu contrato. Você terminou em ${pos}º lugar e o salário atual é R$ ${P.carreira.salario}/mês.`,
+    opcoes:[
+      {t:`Aceitar a proposta (+${Math.round(ganhoBase*100)}%)`, efeito:{}, fx:()=>{ P.carreira.salario = Math.round(P.carreira.salario*(1+ganhoBase)); }, log:"Você renovou o contrato."},
+      {t:"Pedir um aumento maior", efeito:{estresse:+4}, sorte:{p:0.5,ganho:0,perda:0}, fx:()=>{ const sobe = Math.random()<0.5; P.carreira.salario = Math.round(P.carreira.salario*(sobe?1+ganhoBase*2:1)); }, log:"Você negociou com dureza."},
+      {t:"Recusar e buscar outro clube", efeito:{reputacao:+2,felicidade:-3}, log:"Você recusou e vai procurar outro clube."},
+    ]
+  };
 }
 
 function avancarDia(){
   if(P.eventoAtual || jogoPendenteHoje() || P.partida) return;
   P.diaAbs++;
   P.dia++;
+  if(P.lesao){
+    P.lesao.dias--;
+    if(P.lesao.dias<=0){ log(`Você se recuperou da lesão (${P.lesao.tipo}).`, "saude"); P.lesao=null; }
+  }
   if(P.dia > 7){ P.dia = 1; fecharSemana(); }
+  geraNoticiaDoDia();
   if(P.dia !== DIA_JOGO && !P.eventoAtual && Math.random() < CHANCE_EVENTO_DIA){
     const ev = sortearEvento();
     if(ev){ P.eventoAtual = ev; P.cooldown[ev.id] = P.diaAbs; }
@@ -962,10 +1256,12 @@ function avancarDia(){
 
 function ir(t){ P.tela=t; salvar(); render(); }
 
+
+
 const TELAS = [
   {id:"inicio", nome:"Hoje"}, {id:"treino", nome:"Treino"}, {id:"calendario", nome:"Calendário"},
   {id:"vida", nome:"Vida"}, {id:"compras", nome:"Compras"}, {id:"carreira", nome:"Carreira"},
-  {id:"historico", nome:"Histórico"}, {id:"perfil", nome:"Perfil"},
+  {id:"noticias", nome:"Notícias"}, {id:"historico", nome:"Histórico"}, {id:"perfil", nome:"Perfil"},
 ];
 
 function barra(v){ return `<div class="bar"><i style="width:${v}%"></i></div>`; }
@@ -992,7 +1288,7 @@ function render(){
   }
   if(P.idade >= IDADE_MAX){ return aposentar(); }
   if(P.partida){ app().innerHTML = telaPartida(); return; }
-  const fn = {inicio:telaInicio, treino:telaTreino, calendario:telaCalendario, vida:telaVida, compras:telaCompras, carreira:telaCarreira, historico:telaHistorico, perfil:telaPerfil}[P.tela] || telaInicio;
+  const fn = {inicio:telaInicio, treino:telaTreino, calendario:telaCalendario, noticias:telaNoticias, vida:telaVida, compras:telaCompras, carreira:telaCarreira, historico:telaHistorico, perfil:telaPerfil}[P.tela] || telaInicio;
   app().innerHTML = fn();
 }
 
@@ -1020,25 +1316,43 @@ function telaInicio(){
 
   const jogoHoje = jogoDeHoje();
   const adv = jogoHoje ? (jogoHoje[0]===P.carreira.clube ? jogoHoje[1] : jogoHoje[0]) : null;
+  const foraDoJogo = P.lesao || P.suspenso;
   const proximo = (!jogoHoje && P.semana<=TEMPORADA_RODADAS && P.dia<DIA_JOGO)
     ? jogoDoJogadorNaRodada(P.semana) : null;
 
-  const cardJogo = jogoPendenteHoje() ? `
+  let cardJogo = "";
+  if(jogoPendenteHoje()){
+    cardJogo = `
     <div class="card" style="border-color:var(--gold)">
       <h3>Dia de jogo</h3>
       <p>Hoje você enfrenta <b>${adv}</b> pela rodada ${P.semana}.</p>
-      <div class="btns"><button class="b primary" onclick="iniciarPartida()">Entrar em campo</button></div>
-    </div>` : (proximo ? `
-    <div class="card">
-      <h3>Próximo jogo</h3>
-      <p class="mut">Sábado: contra <b>${proximo[0]===P.carreira.clube?proximo[1]:proximo[0]}</b> (rodada ${P.semana})</p>
-    </div>` : "");
+      ${foraDoJogo
+        ? `<p class="mut">${P.lesao?`Lesionado (${P.lesao.tipo}, ${P.lesao.dias} dias).`:"Suspenso por cartões."} Você fica de fora.</p>
+           <div class="btns"><button class="b primary" onclick="jogarSemJogador()">Acompanhar o jogo</button></div>`
+        : `<div class="btns"><button class="b primary" onclick="iniciarPartida()">Entrar em campo</button></div>`}
+    </div>`;
+  } else if(proximo){
+    cardJogo = `
+    <div class="card"><h3>Próximo jogo</h3>
+      <p class="mut">Sábado: contra <b>${proximo[0]===P.carreira.clube?proximo[1]:proximo[0]}</b> (rodada ${P.semana})</p></div>`;
+  }
+
+  const status = (P.lesao || P.suspenso) ? `
+    <div class="card ev">
+      <h3>Situação física</h3>
+      ${P.lesao?`<p>Lesão: ${P.lesao.tipo}. Previsão de ${P.lesao.dias} dias. Use Fisioterapia nas atividades para acelerar.</p>`:""}
+      ${P.suspenso?`<p>Suspenso por dois cartões amarelos. Fica de fora do próximo jogo.</p>`:""}
+    </div>` : "";
 
   const ultimo = P.ultimoJogo ? `
     <div class="card">
       <h3>Último jogo</h3>
       <p><b>${P.ultimoJogo.res==="V"?"Vitória":P.ultimoJogo.res==="E"?"Empate":"Derrota"}</b> · ${P.ultimoJogo.placar[0]}x${P.ultimoJogo.placar[1]} contra ${P.ultimoJogo.adv} · nota ${P.ultimoJogo.nota}</p>
+      ${P.ultimoJogo.clima?`<p class="mut">${P.ultimoJogo.clima} · ${P.ultimoJogo.arbitragem}</p>`:""}
     </div>` : "";
+
+  const noticias = (P.noticias||[]).slice(0,3).map(n=>`<p>${n.t}</p>`).join("");
+  const cardNoticias = noticias ? `<div class="card"><h3>Notícias</h3><div class="log">${noticias}</div></div>` : "";
 
   const podeAtividade = P.diaAtividade !== P.diaAbs;
   const treinou = jaTreinouNestaSemana();
@@ -1056,17 +1370,16 @@ function telaInicio(){
       </div>
     </section>
     ${cardJogo}
+    ${status}
     ${ev}
     ${ultimo}
+    ${cardNoticias}
     <div class="card">
       <h3>Ações de hoje</h3>
       <div class="btns">
         <button class="b" ${treinou?"disabled":""} onclick="ir('treino')">Treinar${treinou?" (já treinou esta semana)":""}<small>Um treino por semana</small></button>
-        <button class="b" ${podeAtividade?"":"disabled"} onclick="document.getElementById('atv').scrollIntoView()">Atividade${podeAtividade?"":" (já fez hoje)"}<small>Uma por dia</small></button>
       </div>
-      <div id="atv" style="margin-top:12px">
-        <div class="btns">${ATIVIDADES.map(a=>`<button class="b" ${podeAtividade?"":"disabled"} onclick="atividade('${a.id}')">${a.nome}<small>${a.desc}</small></button>`).join("")}</div>
-      </div>
+      <div style="margin-top:12px"><div class="btns">${ATIVIDADES.map(a=>`<button class="b" ${podeAtividade?"":"disabled"} onclick="atividade('${a.id}')">${a.nome}<small>${a.desc}</small></button>`).join("")}</div></div>
       <div class="btns" style="margin-top:14px">
         <button class="b primary" ${bloqueio?"disabled":""} onclick="avancarDia()">Próximo dia →</button>
         ${bloqueio?`<span class="mut" style="align-self:center">${bloqueio}</span>`:""}
@@ -1083,9 +1396,9 @@ function telaPartida(){
   const cabecalho = `
     <section class="hero">
       <div>
-        <div class="kicker">Rodada ${pt.rodada} · ${pt.mandante?"Em casa":"Fora"}</div>
+        <div class="kicker">Rodada ${pt.rodada} · ${pt.mandante?"Em casa":"Fora"} · ${pt.clima.nome} · ${pt.arbitragem.nome}</div>
         <h2>${P.carreira.clube} x ${pt.adv}</h2>
-        <p class="mut">Placar: <b>${pt.gP} x ${pt.gA}</b></p>
+        <p class="mut">Placar: <b>${pt.gP} x ${pt.gA}</b> · ${pt.titular?"Titular":"Reserva (entra com menos tempo)"}</p>
       </div>
     </section>`;
 
@@ -1102,11 +1415,21 @@ function telaPartida(){
       <div class="btns"><button class="b primary" ${pt.tatica&&pt.instrucao?"":"disabled"} onclick="comecarJogo()">Começar o jogo</button></div>`;
   }
 
-  const lance = LANCES[pt.lance];
+  if(pt.fase === "intervalo"){
+    return `${cabecalho}
+      <div class="card ev">
+        <h3>Intervalo · palestra</h3>
+        <p>O primeiro tempo acabou. Como você fala com o grupo?</p>
+        <div class="btns">${PALESTRAS.map((p,i)=>`<button class="b" onclick="resolverPalestra(${i})">${p.nome}<small>${p.desc}</small></button>`).join("")}</div>
+      </div>
+      <div class="card log">${pt.log.slice(-4).map(l=>`<p><span class="mut">${l.titulo}:</span> ${l.texto} <b>(${l.placar[0]}x${l.placar[1]})</b></p>`).join("")}</div>`;
+  }
+
+  const lance = pt.lancesDoJogo[pt.lance];
   const historico = pt.log.map(l=>`<p><span class="mut">${l.titulo}:</span> ${l.texto} <b>(${l.placar[0]}x${l.placar[1]})</b></p>`).join("");
   return `${cabecalho}
     <div class="card ev">
-      <h3>Lance ${pt.lance+1} de ${LANCES.length} · ${lance.titulo}</h3>
+      <h3>Lance ${pt.lance+1} de ${pt.lancesDoJogo.length} · ${lance.titulo}</h3>
       <p>${lance.texto}</p>
       <div class="btns">${lance.opcoes.map((o,i)=>`<button class="b" onclick="resolverLance(${i})">${o.t}</button>`).join("")}</div>
     </div>
@@ -1139,11 +1462,14 @@ function telaCalendario(){
         ${linhas}
       </table></div>
     </div>
-    <div class="card">
-      <h3>Seus jogos</h3>
-      ${rodadas}
-    </div>`;
+    <div class="card"><h3>Seus jogos</h3>${rodadas}</div>`;
 }
+
+function telaNoticias(){
+  const itens = (P.noticias||[]).map(n=>`<p><span class="mut">S${n.semana}/${n.ano}</span> · ${n.t}</p>`).join("");
+  return `<div class="card log">${itens || "<p class='mut'>Nenhuma notícia ainda.</p>"}</div>`;
+}
+
 
 /* ---------- Treino: uma sessão por semana, com duas decisões ---------- */
 const NOME_ATRIBUTO = {
@@ -1410,7 +1736,13 @@ function aposentarAgora(){ if(confirm("Encerrar a carreira agora?")) aposentar()
 
 /* ---------- Inicialização ---------- */
 P = carregar();
-if(P){ P.xp = P.xp || Object.fromEntries(Object.keys(P.at).map(k=>[k,0])); }
+if(P){
+  P.xp = P.xp || Object.fromEntries(Object.keys(P.at).map(k=>[k,0]));
+  P.rel = P.rel || {}; if(P.rel.treinador==null) P.rel.treinador = 50;
+  P.noticias = P.noticias || []; P.lesao = P.lesao || null;
+  P.cartoes = P.cartoes || 0; P.suspenso = !!P.suspenso;
+  P.resultados = P.resultados || {};
+}
 render();
 </script>
 </body>
