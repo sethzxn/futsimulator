@@ -671,12 +671,33 @@ const EVENTOS_PARTIDA_TIPO = [
   { id:"gol_bobo", peso:(pt,P)=> P.mente.felicidade>=70 ? 1.5 : 0.4, texto:"Você ri de uma jogada boba com um colega, e o clima melhora no campo.", efeito:{atq:+0.02} },
 ];
 
+const FRASE_PARTES = {
+  contexto: ["","","Pela torcida,","No meio da pressão,","Sem perder a cabeça,","Com a defesa aberta,","Nos instantes finais,","Com a chuva caindo,","Diante do público,","Depois de um bom treino,","Em um lance de muita categoria,"],
+  defesa_sujeito: ["Você","O zagueiro","O lateral","O volante","Seu parceiro de zaga","O goleiro"],
+  adv_sujeito: ["O atacante adversário","O meia rival","O ponta rival","O centroavante rival","O camisa dez deles"],
+  adv_verbo: ["passa pela sua marcação","chega livre na área","ganha a corrida pelo meio","recebe de costas e gira","finaliza de longe","sobe mais alto que a zaga"],
+  adv_final: ["e a defesa precisa reagir","e a torcida prende a respiração","e o goleiro se estica para salvar","e a bola passa raspando a trave"],
+  ataque_sujeito: ["Você","O ponta","O meia","O volante","O centroavante","O lateral"],
+  ataque_verbo: ["recebe a bola entre as linhas","cruza para a área","infiltra pelo meio","acelera pela ponta","pede a bola no pé","gira e encontra espaço"],
+  ataque_final: ["e o público explode","e o goleiro se atira para o lado errado","e a defesa não consegue acompanhar","e a jogada termina na rede","e o árbitro deixa a vantagem correr"],
+  defesa_verbo: ["fecha o espaço","acompanha o atacante","antecipa o passe","desarma no momento certo","se posiciona bem na área"],
+  defesa_final: ["e o ataque morre no nascedouro","e a torcida aplaude","e a bola sobra para o time respirar","e o adversário desiste da jogada","e a saída de bola começa de novo"],
+};
 function gerarFraseDoLance(acao, acerto){
-  const quem = pick(PARTIDA_PARTES.ataque_sucesso);
-  if(acerto){
-    return `${quem} ${pick(PARTIDA_PARTES.ataque_verbo)} ${pick(PARTIDA_PARTES.ataque_final)}.`;
+  const ataque = ["chute","passe","drible","cabeca","segura"].includes(acao);
+  const ctx = pick(FRASE_PARTES.contexto);
+  let corpo;
+  if(ataque && acerto){
+    corpo = `${pick(FRASE_PARTES.ataque_sujeito)} ${pick(FRASE_PARTES.ataque_verbo)} ${pick(FRASE_PARTES.ataque_final)}`;
+  } else if(ataque){
+    corpo = `${pick(FRASE_PARTES.defesa_sujeito)} ${pick(FRASE_PARTES.defesa_verbo)}, ${pick(FRASE_PARTES.defesa_final)}`;
+  } else if(acerto){
+    corpo = `${pick(FRASE_PARTES.defesa_sujeito)} ${pick(FRASE_PARTES.defesa_verbo)}, ${pick(FRASE_PARTES.defesa_final)}`;
+  } else {
+    corpo = `${pick(FRASE_PARTES.adv_sujeito)} ${pick(FRASE_PARTES.adv_verbo)}, ${pick(FRASE_PARTES.adv_final)}`;
   }
-  return `${quem} ${pick(PARTIDA_PARTES.defesa_verbo)}, ${pick(PARTIDA_PARTES.defesa_final)}.`;
+  const frase = ctx ? `${ctx} ${corpo.charAt(0).toLowerCase()+corpo.slice(1)}` : corpo;
+  return frase.charAt(0).toUpperCase() + frase.slice(1) + ".";
 }
 
 // Eventos de vida procedurais: milhares de combinações de quem, o que pede e o que você decide.
@@ -813,7 +834,7 @@ const NOT_MODELOS = [
   () => `${pick(["Chuva","Calor","Vento"])} forte deve marcar os próximos jogos, segundo a previsão.`,
   () => `A cidade de ${P.perfil.cidade||"sua cidade"} organiza um dia de festa para a base do clube.`,
   () => `Um vídeo de treino do ${P.carreira.clube} circula nas redes e chama atenção.`,
-  () => `${pick(NOT_SUJEITO)} de ${pick(CLUBES_LIGA)} é anunciado como novo reforço da base.`,
+  () => `${pick(["Um lateral","Um volante","Um atacante","Um goleiro"])} de ${pick(CLUBES_LIGA)} é anunciado como reforço da base.`,
   () => `Patrocinador ${pick(["de bebidas","de material esportivo","de transporte"])} escolhe ${P.carreira.clube} para ação na cidade.`,
 ];
 function gerarNoticia(){
@@ -1052,7 +1073,73 @@ const TEXTOS = {
   anulado:["O VAR anula o gol por impedimento.","Gol anulado depois de revisão, a torcida protesta."],
   chance_perdida:["O goleiro adversário faz uma defesa milagrosa!","Você teve a chance, mas a bola bateu na trave."],
 };
-const pickTxt = k => pick(TEXTOS[k] || ["..."]);
+/* ---------- Textos dos lances, montados a partir de partes ----------
+   Cada resultado tem início, lugar e fim. Combinando as partes, cada lance sai diferente. */
+const TXT = {
+  chute_gol: { ini:["Você chuta","Você bate forte","Você solta a bomba","Você finaliza cruzado","Você manda de primeira","Você arrisca de longe"],
+    lugar:["no canto de baixo","no ângulo, sem chance para o goleiro","rente à trave","no meio do gol, e o goleiro não se mexe","por cima do goleiro","no cantinho, onde ninguém alcança"],
+    fim:["Gol!","A rede balança.","O estádio explode.","É golaço!","A torcida canta seu nome."] },
+  chute_defendido: { ini:["Você chuta","Você finaliza","Você tenta de longe","Você bate cruzado"],
+    lugar:["mas o goleiro espalma para escanteio","e o goleiro faz a defesa com as mãos","e a bola bate no goleiro e sai","e o goleiro voa para o canto"],
+    fim:["A torcida lamenta.","Quase!","Mesmo assim, o time insiste."] },
+  chute_erro: { ini:["Você chuta","Você tenta a finalização","Você manda a bomba"],
+    lugar:["e a bola sai pela linha de fundo","alto, por cima do travessão","para fora, sem direção","e a bola some na arquibancada"], fim:["Que chance perdida.",""] },
+  passe_ok: { ini:["Você toca","Você acha o companheiro com um passe","Você dá um passe"],
+    lugar:["para o ponta, que avança","para o meia, que ganha o campo","no pé do lateral, em velocidade","entre dois marcadores"], fim:["O time avança.","O ataque ganha ritmo.",""] },
+  passe_gol: { ini:["Você lança","Você serve","Você deixa passar"],
+    lugar:["para o companheiro, que finaliza sem erro","na medida, e o colega marca","de calcanhar, e o atacante fuzila","em profundidade, e o atacante chuta cruzado"], fim:["Assistência sua!","Você deu o passe do gol."] },
+  passe_erro: { ini:["O seu passe sai","O passe de você é","Você erra o toque"],
+    lugar:["alto demais e cai na arquibancada","interceptado no meio-campo","torto, e o adversário sai com a bola","fraco, e o marcador lê a jogada"], fim:["",""] },
+  drible_ok: { ini:["Você arranca com a bola","Você encara o marcador"],
+    lugar:["e deixa dois para trás","e passa pelo lateral com um toque de corpo","e ganha uma linha de vantagem","e protege a bola até o apoio chegar"], fim:["O estádio aplaude.",""] },
+  drible_gol: { ini:["Você dribla dois marcadores","Você passa pelo goleiro"],
+    lugar:["e chuta sem chance de defesa","e finaliza no canto vazio","e a bola morre no fundo da rede"], fim:["Gol de craque!","Que jogada!"] },
+  drible_erro: { ini:["O drible não dá certo","O marcador encaixa"],
+    lugar:["e você perde a bola na linha lateral","e rouba a bola no seu pé","e o drible termina no chão"], fim:["",""] },
+  cabeca_gol: { ini:["Você sobe mais que todo mundo","A bola chega alta e você sobe"],
+    lugar:["e cabeceia forte para o gol","e marca de cabeça, sem chance para o goleiro"], fim:["Gol!","Cabeçada certeira."] },
+  cabeca_defendido: { ini:["Você cabeceia","Você sobe e cabeceia"],
+    lugar:["mas o goleiro espalma","e a bola sai rente ao travessão"], fim:["",""] },
+  cabeca_erro: { ini:["Você sobe","Você cabeceia"],
+    lugar:["mas não acerta a bola","e a cabeçada sai por cima do gol"], fim:["",""] },
+  marca_ok: { ini:["Você acompanha o atacante","Você antecipa a jogada"],
+    lugar:["e desarma no momento certo","e tira a bola do pé dele","e corta o passe antes da chegada"], fim:["Bola recuperada.",""] },
+  marca_erro: { ini:["O atacante passa por você","Você chega atrasado"],
+    lugar:["e fica livre para a finalização","e o atacante avança pela lateral"], fim:["",""] },
+  pressao_ok: { ini:["Você pressiona a saída","Você aperta o marcador"],
+    lugar:["e o adversário erra o passe","e a bola volta para o seu time"], fim:["",""] },
+  pressao_erro: { ini:["Sua pressão chega tarde","Você avança e deixa espaço"],
+    lugar:["e o adversário passa livre","e a jogada vira contra você"], fim:["",""] },
+  recua_ok: { ini:["Você fecha o espaço","Você recua com inteligência"],
+    lugar:["e a jogada morre","e o adversário não tem onde chegar"], fim:["",""] },
+  recua_erro: { ini:["Você recua demais","Você demora a fechar"],
+    lugar:["e o adversário chega sem marcação","e o atacante se aproveita do espaço"], fim:["",""] },
+  reclama_ok: { ini:["Você reclama com veemência"], lugar:["e o árbitro mostra o amarelo para o adversário"], fim:["Funcionou.",""] },
+  reclama_erro: { ini:["Você reclama, mas o árbitro segue"], lugar:["sem mudar nada","e manda o jogo continuar"], fim:["",""] },
+  fim_ataque_gol: { ini:["Nos minutos finais, o time marca","Pressão total, e a bola entra"],
+    lugar:["no último minuto","depois de um escanteio insistente"], fim:["O estádio vai à loucura.",""] },
+  fim_ataque_erro: { ini:["O ataque insiste","O time avança"], lugar:["mas a bola não entra","e a defesa segura"], fim:["",""] },
+  fim_defesa_ok: { ini:["O time segura o resultado","A defesa fecha tudo"], lugar:["até o apito","nos minutos finais"], fim:["Respiro de alívio.",""] },
+  fim_defesa_erro: { ini:["Uma falha no fim do jogo","O cansaço pesa"], lugar:["e o adversário chega","e a defesa abre espaço"], fim:["",""] },
+  contra_gol: { ini:["O adversário marca no contra-ataque","Falha coletiva, e o adversário marca","Gol sofrido depois de um erro na saída"],
+    lugar:["com um chute colocado","depois de um passe em profundidade","sem marcação na área"], fim:["",""] },
+};
+const CTX_TXT = {
+  chuva: ["Com o gramado molhado, ","Na chuva, "],
+  calor: ["Sob o sol forte, "],
+  vento: ["Contra o vento, "],
+};
+function montarTexto(k){
+  const d = TXT[k];
+  let s = `${pick(d.ini)} ${pick(d.lugar)}`;
+  const fim = pick(d.fim).trim();
+  if(fim && Math.random()<0.6) s += `. ${fim}`;
+  const cli = P.partida?.clima?.id;
+  if(cli && CTX_TXT[cli] && Math.random()<0.2) s = pick(CTX_TXT[cli]) + s.charAt(0).toLowerCase() + s.slice(1);
+  return s.charAt(0).toUpperCase() + s.slice(1) + (s.endsWith(".")||s.endsWith("!")||s.endsWith("?") ? "" : ".");
+}
+const pickTxt = k => TXT[k] ? montarTexto(k) : pick(TEXTOS[k] || ["..."]);
+
 
 
 function pesoLance(l, pt){
@@ -1070,7 +1157,7 @@ function pesoLance(l, pt){
 }
 function escolherLancesDaPartida(titular, pt){
   const restantes = LANCES_POOL.filter(l=>l.tipo!=="fim");
-  const quantidade = titular ? 5 : 3;
+  const quantidade = titular ? 7 : 4;
   const escolhidos = [];
   for(let k=0; k<quantidade && restantes.length; k++){
     const pesos = restantes.map(l=>pesoLance(l, pt));
@@ -1137,7 +1224,7 @@ function resolverLance(i){
   const comEquipe = pt.titular ? 0 : -0.02;
 
   let p = op.base + (at-50)*0.006 + forma + estresse + comEquipe;
-  if(ataque) p += tat.atq + ins.atq + pt.bonusAtq + cli.atq;
+  if(ataque) p += tat.atq + ins.atq + pt.bonusAtq + cli.atq + 0.10;
   if(lance.tipo==="defesa") p += tat.def + pt.bonusDef;
   if(op.acao==="passe") p += ins.pas + cli.pas;
   if(op.acao==="chute" || op.acao==="cabeca") p += cli.fin;
@@ -1146,29 +1233,29 @@ function resolverLance(i){
   const acerto = Math.random() < p;
 
   const forcaAdv = forcaTime(pt.adv);
-  const pContra = clamp(0.16 + (forcaAdv-50)/200 + (tat.def<0?0.03:0) - tat.def*0.5 - pt.bonusDef, 0.05, 0.6);
+  const pContra = clamp(0.11 + (forcaAdv-50)/200 + (tat.def<0?0.03:0) - tat.def*0.5 - pt.bonusDef, 0.05, 0.6);
 
   let texto = "", gol=false, golJ=false, asst=false, contra=false, cartao=false, lesao=false, extra=null;
 
   if(ataque){
     if(op.acao==="chute"){
       if(acerto){
-        if(Math.random() < 0.55 + (at-50)/200){ gol=true; golJ=true; texto=pickTxt("chute_gol"); }
+        if(Math.random() < 0.66 + (at-50)/150){ gol=true; golJ=true; texto=pickTxt("chute_gol"); }
         else texto=pickTxt("chute_defendido");
       } else texto=pickTxt("chute_erro");
     } else if(op.acao==="cabeca"){
       if(acerto){
-        if(Math.random() < 0.5){ gol=true; golJ=true; texto=pickTxt("cabeca_gol"); }
+        if(Math.random() < 0.6){ gol=true; golJ=true; texto=pickTxt("cabeca_gol"); }
         else texto=pickTxt("cabeca_defendido");
       } else texto=pickTxt("cabeca_erro");
     } else if(op.acao==="passe"){
       if(acerto){
-        if(Math.random()<0.42){ gol=true; asst=true; texto=pickTxt("passe_gol"); }
+        if(Math.random()<0.5){ gol=true; asst=true; texto=pickTxt("passe_gol"); }
         else texto=pickTxt("passe_ok");
       } else texto=pickTxt("passe_erro");
     } else if(op.acao==="drible"){
       if(acerto){
-        if(Math.random()<0.30){ gol=true; golJ=true; texto=pickTxt("drible_gol"); }
+        if(Math.random()<0.4){ gol=true; golJ=true; texto=pickTxt("drible_gol"); }
         else texto=pickTxt("drible_ok");
       } else texto=pickTxt("drible_erro");
     } else {
@@ -1182,12 +1269,12 @@ function resolverLance(i){
       texto = pickTxt(op.acao+"_ok");
     } else {
       texto = pickTxt(op.acao+"_erro");
-      contra = Math.random() < pContra + 0.15;
+      contra = Math.random() < pContra + 0.08;
       if(op.acao==="marca" || op.acao==="pressao"){ cartao = Math.random() < pt.arbitragem.cartao * (1 + (60-P.mente.disciplina)/100 + (P.mente.estresse-40)/150); }
     }
   } else {
     if(op.acao==="fim_ataque"){
-      if(Math.random() < (acerto?0.32:0.12)){ gol=true; texto=pickTxt("fim_ataque_gol"); }
+      if(Math.random() < (acerto?0.45:0.2)){ gol=true; texto=pickTxt("fim_ataque_gol"); }
       else texto=pickTxt("fim_ataque_erro");
       contra = Math.random() < (acerto?0.15:0.30);
     } else {
