@@ -97,6 +97,74 @@
     .hero h2{font-size:28px}
     .brand{font-size:20px}
   }
+
+  /* ===== Visual The Fenômeno: fundo quase preto, dourado, cartão de jogador ===== */
+  :root{
+    --navy:#0a0a0a; --navy2:#1c1c1c; --gold:#F2B705; --gold-ink:#F2B705; --gold-bg:#2a2208;
+    --floor:#060606; --paper:#121212; --paper2:#191919;
+    --ink:#f4f4f5; --mut:#a1a1aa; --dim:#71717a; --line:#262626; --line2:#3a3a3a;
+    --blue:#F2B705; --blue-bg:#241d05; --blue-line:#5a4a10;
+    --ok:#22c55e; --ok-bg:#0f2a19; --bad:#ef4444; --bad-bg:#2a1111;
+    --warn-ink:#F2B705; --warn-bg:#1d1806; --warn-line:#5a4a10; --gold-line:#F2B705;
+  }
+  body{background:radial-gradient(ellipse at top,#171200 0%,var(--floor) 45%)}
+  header{background:#000;box-shadow:0 2px 0 var(--gold)}
+  .brand{font-stretch:100%;font-weight:900;font-size:26px;letter-spacing:1px}
+  .hero{background:linear-gradient(135deg,#1a1505 0%,#080808 70%);border:1px solid #2e2608}
+  .hero h2{font-weight:900;font-size:clamp(26px,4.5vw,40px);letter-spacing:-.5px}
+  .hero .mut{color:#c4c4cc}
+  .kicker{font-family:var(--title);font-size:12px;font-weight:800;letter-spacing:2px;text-transform:uppercase}
+  .card{background:var(--paper);border-color:var(--line)}
+  .stat b{color:var(--ink)}
+  button.b{background:var(--paper2);color:var(--ink);border-color:var(--line2)}
+  button.b:hover{border-color:var(--gold);background:#221c06}
+  button.b:disabled{background:var(--paper)}
+  button.b:disabled:hover{border-color:var(--line2);background:var(--paper)}
+  button.b small{color:var(--mut)}
+  button.primary{background:var(--gold);color:#0a0a0a;border-color:var(--gold)}
+  button.primary:hover{background:#ffd23f;border-color:#ffd23f}
+  input,select,textarea{background:var(--paper2);color:var(--ink);border-color:var(--line2)}
+  .avatar{background:#1a1a1a}
+  .ev{border-color:var(--gold);background:#1d1806}
+  .row{border-color:var(--line)}
+  .log p{border-left-color:var(--gold)}
+  .tbl th,.tbl td{border-color:var(--line)}
+  .tbl tr.me td{background:var(--gold-bg);color:var(--gold)}
+
+  /* Manchete rolando no topo */
+  .ticker{overflow:hidden;background:#000;border-top:1px solid var(--line);height:30px;display:flex;align-items:center;white-space:nowrap}
+  .tk-track{display:inline-flex;gap:56px;padding-left:100%;animation:tk 60s linear infinite;color:#d4d4d8;font:700 12px var(--title);text-transform:uppercase;letter-spacing:.6px}
+  .tk-track span::before{content:"● ";color:var(--gold)}
+  @keyframes tk{to{transform:translateX(-100%)}}
+
+  /* Cartão de jogador, estilo carta de videogame */
+  .hero-fc{align-items:center;flex-wrap:wrap}
+  .hero-txt{flex:1;min-width:200px}
+  .fcard{width:190px;flex:0 0 auto;background:linear-gradient(165deg,#3a2f06 0%,#0d0b02 55%,#000 100%);border:2px solid var(--gold);border-radius:16px;padding:14px 12px 10px;text-align:center;box-shadow:0 14px 40px rgba(242,183,5,.18);color:#fff}
+  .fc-top{display:flex;justify-content:space-between;align-items:flex-start;padding:0 4px}
+  .fc-ovr{font-size:46px;font-weight:900;color:var(--gold);line-height:1;font-variant-numeric:tabular-nums}
+  .fc-pos{font-size:14px;font-weight:900;letter-spacing:1px;padding-top:6px}
+  .fc-av{width:112px;height:112px;margin:8px auto 4px;border-radius:50%;overflow:hidden;border:2px solid var(--gold);background:#1a1a1a}
+  .fc-av svg{width:100%;height:100%;display:block}
+  .fc-name{font-weight:900;text-transform:uppercase;font-size:14px;letter-spacing:.3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .fc-tier{font-size:10px;letter-spacing:1.5px;color:var(--gold);font-weight:800;margin:4px 0 10px;text-transform:uppercase}
+  .fc-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;border-top:1px solid #3a3208;padding-top:8px}
+  .fc-stats span{font-size:9px;color:var(--mut);letter-spacing:.6px;font-weight:700}
+  .fc-stats b{display:block;font-size:17px;color:#fff;font-weight:900}
+
+  /* Filtros em pílula e seções numeradas */
+  .pills{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 14px}
+  .pill{padding:7px 14px;border-radius:99px;border:1px solid var(--line2);background:var(--paper);color:var(--mut);font:800 12px var(--title);text-transform:uppercase;letter-spacing:.5px;cursor:pointer}
+  .pill:hover{color:#fff;border-color:var(--gold)}
+  .pill.on{background:var(--gold);color:#0a0a0a;border-color:var(--gold)}
+  .sec-num{font:900 12px var(--title);letter-spacing:2px;color:var(--gold);text-transform:uppercase;margin:4px 0 10px}
+  .rk-me td{background:var(--gold-bg);color:var(--gold);font-weight:800}
+  .rk-tier{font-size:10px;letter-spacing:1px;color:var(--mut);text-transform:uppercase;font-weight:700}
+  @media (max-width:560px){
+    .hero-fc{flex-direction:column;text-align:center}
+    .fcard{width:100%;max-width:260px}
+    .tk-track{font-size:11px}
+  }
 </style>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Kaushan+Script&family=Archivo:wdth,wght@62..125,400..900&display=swap" rel="stylesheet">
 </head>
@@ -107,6 +175,7 @@
     <div class="mut" id="hdr"></div>
   </div>
   <nav class="tabs" id="tabs"></nav>
+  <div class="ticker" id="ticker"></div>
 </header>
 <main class="wrap" id="app"></main>
 
@@ -1224,7 +1293,7 @@ function resolverLance(i){
   const comEquipe = pt.titular ? 0 : -0.02;
 
   let p = op.base + (at-50)*0.006 + forma + estresse + comEquipe;
-  if(ataque) p += tat.atq + ins.atq + pt.bonusAtq + cli.atq + 0.10;
+  if(ataque) p += tat.atq + ins.atq + pt.bonusAtq + cli.atq + 0.10 + (P.nivel==='pro' ? -0.05 : 0.03);
   if(lance.tipo==="defesa") p += tat.def + pt.bonusDef;
   if(op.acao==="passe") p += ins.pas + cli.pas;
   if(op.acao==="chute" || op.acao==="cabeca") p += cli.fin;
@@ -1233,7 +1302,7 @@ function resolverLance(i){
   const acerto = Math.random() < p;
 
   const forcaAdv = forcaTime(pt.adv);
-  const pContra = clamp(0.11 + (forcaAdv-50)/200 + (tat.def<0?0.03:0) - tat.def*0.5 - pt.bonusDef, 0.05, 0.6);
+  const pContra = clamp(0.11 + (P.nivel==='pro' ? 0.04 : -0.03) + (forcaAdv-50)/200 + (tat.def<0?0.03:0) - tat.def*0.5 - pt.bonusDef, 0.05, 0.6);
 
   let texto = "", gol=false, golJ=false, asst=false, contra=false, cartao=false, lesao=false, extra=null;
 
@@ -1334,6 +1403,7 @@ function finalizarPartida(){
   simularOutrosJogos(pt.rodada);
 
   const nota = clamp(6 + pt.gJ*1.2 + pt.asJ*0.8 - pt.gA*0.3 + (P.corpo.forma-50)/60 + (Math.random()-0.5) - pt.cartoesJog*0.4, 3, 10);
+  P.golsTemp = (P.golsTemp||0) + pt.gJ;
   P.stats.jogos++; P.stats.gols += pt.gJ; P.stats.assist += pt.asJ; P.stats.notas.push(Number(nota.toFixed(1)));
   P.stats.cartoes = (P.stats.cartoes||0) + pt.cartoesJog;
   if(res==="V"){ P.vida.dinheiro += 400; P.mente.reputacao = clamp(P.mente.reputacao+1,0,100); P.mente.felicidade = clamp(P.mente.felicidade+6,0,100); }
@@ -1486,6 +1556,8 @@ function fecharTemporada(){
   const pos = tab.findIndex(t=>t.nome===P.carreira.clube)+1;
   if(pos===1){ P.carreira.titulos++; P.vida.dinheiro += 2000; P.mente.reputacao = clamp(P.mente.reputacao+5,0,100); log(`Campeão da temporada ${P.liga.temporada}!`, "conquista"); }
   else log(`Terminou a temporada ${P.liga.temporada} em ${pos}º lugar.`, "evento");
+  if(pos===1 && (P.golsTemp||0)>=8){ P.stats.bolas = (P.stats.bolas||0)+1; log("Você ganhou a Bola de Ouro da temporada!", "conquista"); }
+  P.golsTemp = 0;
   // renovação de contrato: a proposta depende do desempenho
   const ganhoBase = pos<=3 ? 0.3 : pos<=6 ? 0.15 : 0.05;
   P.eventoAtual = {
@@ -1526,7 +1598,7 @@ function ir(t){ P.tela=t; salvar(); render(); }
 const TELAS = [
   {id:"inicio", nome:"Hoje"}, {id:"treino", nome:"Treino"}, {id:"calendario", nome:"Calendário"},
   {id:"vida", nome:"Vida"}, {id:"compras", nome:"Compras"}, {id:"carreira", nome:"Carreira"},
-  {id:"noticias", nome:"Notícias"}, {id:"historico", nome:"Histórico"}, {id:"perfil", nome:"Perfil"},
+  {id:"ranking", nome:"Ranking"}, {id:"noticias", nome:"Notícias"}, {id:"historico", nome:"Histórico"}, {id:"perfil", nome:"Perfil"},
 ];
 
 function barra(v){ return `<div class="bar"><i style="width:${v}%"></i></div>`; }
@@ -1536,6 +1608,11 @@ function app(){ return document.getElementById("app"); }
 function renderHeader(){
   document.getElementById("hdr").textContent = P ? `${P.perfil.nome} · ${P.idade} anos · sem. ${P.semana}/${P.ano}` : "";
   document.getElementById("tabs").innerHTML = P ? TELAS.map(t=>`<button class="tab ${P.tela===t.id?"on":""}" onclick="ir('${t.id}')">${t.nome}</button>`).join("") : "";
+  const tk = document.getElementById("ticker");
+  if(tk){
+    const itens = P ? [...(P.noticias||[]).slice(0,8).map(n=>n.t), "Roube dos craques. Viva uma carreira. Descubra onde você fica entre os maiores."] : ["Roube dos craques. Viva uma carreira."];
+    tk.innerHTML = `<div class="tk-track">${itens.map(t=>`<span>${t}</span>`).join("")}</div>`;
+  }
 }
 
 function render(){
@@ -1553,7 +1630,7 @@ function render(){
   }
   if(P.idade >= IDADE_MAX){ return aposentar(); }
   if(P.partida){ app().innerHTML = telaPartida(); return; }
-  const fn = {inicio:telaInicio, treino:telaTreino, calendario:telaCalendario, noticias:telaNoticias, vida:telaVida, compras:telaCompras, carreira:telaCarreira, historico:telaHistorico, perfil:telaPerfil}[P.tela] || telaInicio;
+  const fn = {inicio:telaInicio, treino:telaTreino, calendario:telaCalendario, noticias:telaNoticias, ranking:telaRanking, vida:telaVida, compras:telaCompras, carreira:telaCarreira, historico:telaHistorico, perfil:telaPerfil}[P.tela] || telaInicio;
   app().innerHTML = fn();
 }
 
@@ -1594,7 +1671,7 @@ function telaInicio(){
       ${foraDoJogo
         ? `<p class="mut">${P.lesao?`Lesionado (${P.lesao.tipo}, ${P.lesao.dias} dias).`:"Suspenso por cartões."} Você fica de fora.</p>
            <div class="btns"><button class="b primary" onclick="jogarSemJogador()">Acompanhar o jogo</button></div>`
-        : `<div class="btns"><button class="b primary" onclick="iniciarPartida()">Entrar em campo</button></div>`}
+        : `<div class="btns"><button class="b primary" onclick="entrarEmCampo()">Entrar em campo</button></div>`}
     </div>`;
   } else if(proximo){
     cardJogo = `
@@ -1626,12 +1703,22 @@ function telaInicio(){
     : "";
 
   return `
-    <section class="hero">
-      <div class="avatar">${avatarHTML(P)}</div>
-      <div>
+    <section class="hero hero-fc">
+      ${fcardHTML()}
+      <div class="hero-txt">
         <div class="kicker">Semana ${P.semana} · dia ${P.dia}/7 · ${P.ano}</div>
-        <h2>${P.perfil.nome}</h2>
+        <h2>${tierOVR(ovr())}</h2>
         <p class="mut">${P.carreira.clube} · ${P.idade} anos · R$ ${P.vida.dinheiro.toLocaleString("pt-BR")}</p>
+        <div class="sec-num" style="margin-top:14px">Modo de jogo</div>
+        <div class="pills">
+          <span class="pill ${(P.modo||"completo")==="completo"?"on":""}" onclick="setModo('completo')">Simulação completa</span>
+          <span class="pill ${(P.modo||"completo")==="rapido"?"on":""}" onclick="setModo('rapido')">Modo rápido</span>
+        </div>
+        <div class="sec-num">Nível</div>
+        <div class="pills" style="margin-bottom:0">
+          <span class="pill ${(P.nivel||"amador")==="amador"?"on":""}" onclick="setNivel('amador')">Amador</span>
+          <span class="pill ${(P.nivel||"amador")==="pro"?"on":""}" onclick="setNivel('pro')">Pro</span>
+        </div>
       </div>
     </section>
     ${cardJogo}
@@ -1999,6 +2086,118 @@ function aposentar(){
 }
 function aposentarAgora(){ if(confirm("Encerrar a carreira agora?")) aposentar(); }
 
+
+/* ===== The Fenômeno: nota OVR, níveis, ranking e modo rápido ===== */
+function ovr(){
+  const at = Object.values(P.at);
+  const media = at.reduce((a,b)=>a+b,0)/at.length;
+  const bonus = (P.mente.reputacao-10)*0.12 + (P.corpo.forma-50)*0.05 + Math.min(P.stats.gols,200)*0.02 + (P.carreira.titulos||0)*0.8 + (P.stats.bolas||0)*1.5;
+  return clamp(Math.round(media*1.15 + bonus), 1, 99);
+}
+function tierOVR(o){
+  if(o>=95) return "O Fenômeno · praticamente impossível";
+  if(o>=87) return "Top 10 de todos os tempos";
+  if(o>=75) return "Craque · destaque nacional";
+  if(o>=62) return "Jogador comum · titular";
+  return "Novato · em formação";
+}
+function tierCurto(o){
+  if(o>=95) return "O Fenômeno";
+  if(o>=87) return "Top 10";
+  if(o>=75) return "Craque";
+  if(o>=62) return "Titular";
+  return "Novato";
+}
+function posCod(p){
+  p = p || "";
+  if(/Goleiro/.test(p)) return "GOL";
+  if(/Zagueiro|Lateral/.test(p)) return "ZAG";
+  if(/Volante|Meia/.test(p)) return "MEI";
+  return "ATA";
+}
+function fcardHTML(){
+  return `<div class="fcard">
+    <div class="fc-top"><b class="fc-ovr">${ovr()}</b><span class="fc-pos">${posCod(P.perfil.posicao)}</span></div>
+    <div class="fc-av">${avatarHTML(P)}</div>
+    <div class="fc-name">${P.perfil.nome}</div>
+    <div class="fc-tier">${tierCurto(ovr())}</div>
+    <div class="fc-stats">
+      <span><b>${P.stats.gols}</b>GOLS</span><span><b>${P.stats.assist}</b>ASSIST</span>
+      <span><b>${P.carreira.titulos}</b>TÍTULOS</span><span><b>${P.stats.bolas||0}</b>BOLAS</span>
+    </div></div>`;
+}
+const LENDAS = [
+  {nome:"O Relâmpago", pos:"ATA", ovr:97, gols:742, titulos:24, bolas:8},
+  {nome:"Maestro Dourado", pos:"MEI", ovr:96, gols:310, titulos:31, bolas:7},
+  {nome:"A Muralha", pos:"ZAG", ovr:95, gols:41, titulos:27, bolas:2},
+  {nome:"Cometa Sul-Americano", pos:"ATA", ovr:95, gols:688, titulos:19, bolas:6},
+  {nome:"Príncipe da Área", pos:"ATA", ovr:94, gols:603, titulos:17, bolas:5},
+  {nome:"Mago do Meio", pos:"MEI", ovr:93, gols:244, titulos:22, bolas:4},
+  {nome:"Guardião Eterno", pos:"GOL", ovr:92, gols:0, titulos:20, bolas:1},
+  {nome:"Furacão da Ponta", pos:"ATA", ovr:91, gols:512, titulos:12, bolas:3},
+  {nome:"Capitão Silencioso", pos:"ZAG", ovr:90, gols:58, titulos:18, bolas:1},
+  {nome:"Dono da Camisa 10", pos:"MEI", ovr:89, gols:275, titulos:14, bolas:2},
+  {nome:"Lenda da Base", pos:"ATA", ovr:88, gols:380, titulos:9, bolas:1},
+  {nome:"Goleiro de Aço", pos:"GOL", ovr:87, gols:0, titulos:11, bolas:0},
+];
+function telaRanking(){
+  const f = P.rankFiltro || "Geral";
+  const filtros = ["Geral","GOL","ZAG","MEI","ATA"];
+  const nomes = {GOL:"Goleiros",ZAG:"Defensores",MEI:"Meio-campistas",ATA:"Atacantes",Geral:"Geral"};
+  const eu = {nome:P.perfil.nome, pos:posCod(P.perfil.posicao), ovr:ovr(), gols:P.stats.gols, titulos:P.carreira.titulos, bolas:P.stats.bolas||0, euMesmo:true};
+  const lista = [...LENDAS, eu]
+    .filter(x => f==="Geral" || x.pos===f)
+    .sort((a,b)=> b.ovr-a.ovr || b.gols-a.gols)
+    .slice(0,10);
+  const linhas = lista.map((x,i)=>`
+    <tr class="${x.euMesmo?"rk-me":""}">
+      <td>${i+1}</td>
+      <td>${x.nome}<div class="rk-tier">${tierCurto(x.ovr)}</div></td>
+      <td>${x.pos}</td><td><b>${x.ovr}</b></td><td>${x.gols}</td><td>${x.titulos}</td><td>${x.bolas}</td>
+    </tr>`).join("");
+  return `
+    <section class="hero">
+      <div class="hero-txt">
+        <div class="sec-num">01 · Ranking global</div>
+        <h2>Top 10 de todos os tempos</h2>
+        <p class="mut">Compare sua nota OVR com as maiores carreiras. Os nomes das lendas são fictícios.</p>
+      </div>
+    </section>
+    <div class="pills">${filtros.map(k=>`<span class="pill ${f===k?"on":""}" onclick="setRanking('${k}')">${nomes[k]}</span>`).join("")}</div>
+    <div class="card" style="overflow-x:auto">
+      <table class="tbl">
+        <tr><th>#</th><th>Jogador</th><th>Pos</th><th>OVR</th><th>Gols</th><th>Títulos</th><th>Bolas</th></tr>
+        ${linhas}
+      </table>
+    </div>`;
+}
+function setRanking(k){ P.rankFiltro = k; salvar(); render(); }
+function setModo(m){ P.modo = m; salvar(); render(); }
+function setNivel(n){ P.nivel = n; salvar(); render(); }
+function entrarEmCampo(){
+  if(P.modo === "rapido") jogarRapido(); else iniciarPartida();
+}
+// Modo rápido: a partida acontece sem clicar em cada lance, com tática equilibrada e as melhores escolhas.
+function jogarRapido(){
+  iniciarPartida();
+  const pt = P.partida; if(!pt) return;
+  pt.tatica = "equilibrada"; pt.instrucao = "equipe";
+  comecarJogo();
+  // Escolha automática: evita segurar a bola e prefere ataques que podem virar gol.
+  const VALOR_ACAO = {chute:1.6, cabeca:1.4, drible:1.1, passe:0.85, fim_ataque:1.2, fim_defesa:0.9, marca:1, recua:0.9, pressao:0.9, reclama:0.8};
+  const pontuacao = o => o.acao==='segura' ? -1 : o.base*(VALOR_ACAO[o.acao]??1) + ((P.at[o.attr]??50)-50)/100 - (o.risco?0.05:0);
+  let guarda = 0;
+  while(P.partida && guarda++ < 60){
+    const atual = P.partida;
+    if(atual.fase === "intervalo"){ resolverPalestra(0); continue; }
+    if(atual.fase !== "jogo") break;
+    const lance = atual.lancesDoJogo[atual.lance];
+    let melhor = 0;
+    lance.opcoes.forEach((o,i)=>{ if(pontuacao(o) > pontuacao(lance.opcoes[melhor])) melhor = i; });
+    resolverLance(melhor);
+  }
+}
+
 /* ---------- Inicialização ---------- */
 P = carregar();
 if(P){
@@ -2008,6 +2207,7 @@ if(P){
   P.cartoes = P.cartoes || 0; P.suspenso = !!P.suspenso;
   P.resultados = P.resultados || {};
   P.filaEventos = P.filaEventos || [];
+  P.modo = P.modo || "completo"; P.nivel = P.nivel || "amador"; P.stats.bolas = P.stats.bolas || 0; P.golsTemp = P.golsTemp || 0;
 }
 render();
 </script>
