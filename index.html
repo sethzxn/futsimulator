@@ -1331,6 +1331,15 @@ function iniciarPartida(){
   salvar(); render();
 }
 function escolherTatica(id){ P.partida.tatica = id; salvar(); render(); }
+// Modo narrado: a partida se desenrola sozinha. Em cada lance a opção de maior chance base é a que o time executa.
+function setNarrado(v){ P.partida.narrado = !!v; salvar(); render(); }
+function avancarNarrado(){
+  const pt = P.partida;
+  const lance = pt.lancesDoJogo[pt.lance];
+  let melhor = 0;
+  lance.opcoes.forEach((o,i)=>{ if((o.base||0) > (lance.opcoes[melhor].base||0)) melhor = i; });
+  resolverLance(melhor);
+}
 function escolherInstrucao(id){ P.partida.instrucao = id; salvar(); render(); }
 function comecarJogo(){
   const pt = P.partida;
@@ -2033,6 +2042,13 @@ function telaPartida(){
         <h3>Antes do jogo · sua instrução</h3>
         <div class="btns">${INSTRUCOES.map(x=>`<button class="b ${pt.instrucao===x.id?"sel":""}" onclick="escolherInstrucao('${x.id}')">${x.nome}<small>${x.desc}</small></button>`).join("")}</div>
       </div>
+      <div class="card">
+        <h3>Formato da partida</h3>
+        <div class="btns">
+          <button class="b ${!pt.narrado?"sel":""}" onclick="setNarrado(false)">Com decisões<small>Você escolhe cada lance</small></button>
+          <button class="b ${pt.narrado?"sel":""}" onclick="setNarrado(true)">Narrado<small>A partida se desenrola sozinha, com narração</small></button>
+        </div>
+      </div>
       <div class="btns"><button class="b primary" ${pt.tatica&&pt.instrucao?"":"disabled"} onclick="comecarJogo()">Começar o jogo</button></div>`;
   }
 
@@ -2048,6 +2064,15 @@ function telaPartida(){
 
   const lance = pt.lancesDoJogo[pt.lance];
   const historico = pt.log.map(l=>`<p><span class="mut">${l.titulo}:</span> ${l.texto} <b>(${l.placar[0]}x${l.placar[1]})</b></p>`).join("");
+  if(pt.narrado){
+    return `${cabecalho}
+    <div class="card ev">
+      <h3>Lance ${pt.lance+1} de ${pt.lancesDoJogo.length} · ${lance.titulo}</h3>
+      <p>${lance.texto}</p>
+      <div class="btns"><button class="b primary" onclick="avancarNarrado()">Continuar ▶</button></div>
+    </div>
+    <div class="card log">${historico || "<p class='mut'>O jogo começou.</p>"}</div>`;
+  }
   return `${cabecalho}
     <div class="card ev">
       <h3>Lance ${pt.lance+1} de ${pt.lancesDoJogo.length} · ${lance.titulo}</h3>
