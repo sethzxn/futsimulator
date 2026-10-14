@@ -1643,6 +1643,9 @@ function fecharTemporada(){
     const ranking = candidatos.sort((a,b)=>b.score-a.score).slice(0,3);
     log(`Bola de Ouro ${P.liga.temporada}: finalistas ${ranking.map(x=>x.nome).join(", ")}. Vencedor: ${ranking[0].nome}.`, "conquista");
   }
+  // Copas da temporada: mata-mata de 4 clubes (você + 3 da liga), uma por competição
+  disputarCopa("Copa do Brasil");
+  disputarCopa("Copa Continental");
   // metas do clube: cada meta cumprida dá bônus; cada uma não cumprida pesa no treinador
   const metasRes = (P.liga?.metas||[]).map(m=>({m, ...progressoMeta(m)}));
   for(const x of metasRes){
@@ -1784,6 +1787,64 @@ function penBater(){
   P.penDia = P.semana; penal.alvo = null;
   salvar(); render();
 }
+/* ---------- Copas: mata-mata de 4 clubes, semifinais e final em jogo único ---------- */
+function disputarCopa(nome){
+  const outros = [...CLUBES_LIGA].filter(n=>n!==P.carreira.clube).sort(()=>Math.random()-0.5).slice(0,3);
+  const times = [P.carreira.clube, ...outros];
+  const forca = n => forcaTime(n) ?? 50;
+  const decidir = (a,b) => {
+    const [ga,gb] = simularPlacar(forca(a), forca(b));
+    if(ga!==gb) return ga>gb ? a : b;
+    return Math.random()<0.5 ? a : b; // pênaltis
+  };
+  const sf1 = decidir(times[0], times[1]);
+  const sf2 = decidir(times[2], times[3]);
+  const campeao = decidir(sf1, sf2);
+  P.copas = P.copas || [];
+  P.copas.push({temporada: P.liga.temporada, nome, campeao});
+  if(campeao===P.carreira.clube){
+    P.carreira.titulos++; P.vida.dinheiro += 1000; P.mente.reputacao = clamp(P.mente.reputacao+3,0,100);
+    log(`Você foi campeão da ${nome}!`, "conquista");
+  } else {
+    log(`${nome}: você caiu no mata-mata. Campeão: ${campeao}.`, "evento");
+  }
+}
+
+/* ---------- Cartão para compartilhar (imagem PNG) ---------- */
+function baixarCartao(){
+  const cv = document.createElement("canvas");
+  cv.width = 1080; cv.height = 1080;
+  const g = cv.getContext("2d");
+  if(!g){ alert("Seu navegador não permitiu gerar a imagem."); return; }
+  const grad = g.createLinearGradient(0,0,0,1080);
+  grad.addColorStop(0,"#1a1505"); grad.addColorStop(1,"#050505");
+  g.fillStyle = grad; g.fillRect(0,0,1080,1080);
+  g.fillStyle = "#F2B705"; g.fillRect(0,0,1080,10);
+  g.textAlign = "center";
+  g.font = "bold 46px sans-serif"; g.fillStyle = "#F2B705";
+  g.fillText("THE FENÔMENO · CARREIRA", 540, 110);
+  g.font = "bold 120px sans-serif"; g.fillStyle = "#ffffff";
+  g.fillText(String(ovr()), 540, 360);
+  g.font = "bold 64px sans-serif"; g.fillText(P.perfil.nome, 540, 470);
+  g.font = "40px sans-serif"; g.fillStyle = "#a1a1aa";
+  g.fillText(`${P.carreira.clube} · ${P.idade} anos`, 540, 530);
+  const stats = [["GOLS",P.stats.gols],["ASSIST.",P.stats.assist],["TEMPORADAS",(P.temporadas||[]).length],["TÍTULOS",P.carreira.titulos]];
+  stats.forEach(([n,v],i)=>{
+    const x = 180 + i*240;
+    g.font = "bold 84px sans-serif"; g.fillStyle = "#F2B705"; g.fillText(String(v), x, 680);
+    g.font = "28px sans-serif"; g.fillStyle = "#a1a1aa"; g.fillText(n, x, 730);
+  });
+  g.font = "28px sans-serif"; g.fillStyle = "#71717a";
+  g.fillText("Feito no simulador de carreira", 540, 1010);
+  cv.toBlob(blob=>{
+    if(!blob){ alert("Não foi possível gerar a imagem."); return; }
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `cartao-${(P.perfil.nome||"carreira").replace(/\s+/g,"-").toLowerCase()}.png`;
+    document.body.appendChild(a); a.click(); a.remove();
+  }, "image/png");
+}
+
 async function copiarResumo(){
   const t = (P.temporadas||[]);
   const texto = `${P.perfil.nome} · ${P.carreira.clube} · ${P.idade} anos · OVR ${ovr()} · ${P.stats.gols} gols · ${P.stats.assist} assistências · ${t.length} temporadas · ${P.carreira.titulos} títulos`;
@@ -1890,7 +1951,7 @@ function telaInicio(){
     ${ultimo}
     ${cardNoticias}
     ${cardMetas}
-    <div class="card"><h3>Compartilhar</h3><div class="btns"><button class="b" onclick="copiarResumo()">Copiar resumo da carreira</button></div></div>
+    <div class="card"><h3>Compartilhar</h3><div class="btns"><button class="b" onclick="copiarResumo()">Copiar resumo da carreira</button><button class="b" onclick="baixarCartao()">Baixar cartão (PNG)</button></div></div>
     ${!P.eventoAtual && !jogoPendenteHoje() && !P.partida ? cardPenalti() : ""}
     <div class="card">
       <h3>Ações de hoje</h3>
