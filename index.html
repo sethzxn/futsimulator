@@ -141,6 +141,14 @@ const DADOS = {
   },
 };
 
+const FRASES_ATIVIDADE = {
+  descanso: ["Você dormiu cedo e acordou com outra energia.","Um dia sem compromisso, só descanso.","O corpo agradece: você ficou em casa e recuperou o fôlego."],
+  familia: ["Almoço em família, sem falar de futebol.","Você passou a tarde com a família e ouviu conselhos antigos.","Uma conversa tranquila com seus pais mudou o clima da semana."],
+  amigos: ["Você saiu com os amigos e voltou tarde.","Uma noite de risadas com quem te conhece desde sempre.","Os amigos cobraram sua presença, e você foi."],
+  festa: ["A festa virou madrugada. Você dançou até cansar.","Uma festa cheia de gente e de fotos que vão circular amanhã.","Você exagerou na festa e sentiu no dia seguinte."],
+  lazer: ["Um filme e um jogo de videogame no sofá.","Você leu um livro até tarde.","Um passeio sem celular, só para respirar."],
+  fisio: ["A fisioterapeuta trabalhou sua musculatura com calma.","Sessão de fisioterapia: exercícios, gelo e muita paciência.","Você seguiu o protocolo do departamento médico à risca."],
+};
 const ATIVIDADES = [
   { id:"descanso", nome:"Descansar", desc:"Recupera forma, reduz estresse", efeito:{forma:+8,estresse:-8} },
   { id:"familia", nome:"Tempo com a família", desc:"Melhora relação com a família", efeito:{felicidade:+4,estresse:-3,rel_familia:+4} },
@@ -672,26 +680,6 @@ function gerarFraseDoLance(acao, acerto){
 }
 
 // Eventos de vida procedurais: milhares de combinações de quem, o que pede e o que você decide.
-const DECISOES_VIDA = [
-  {t:"Ajudar", efeito:{rel_familia:+4,dinheiro:-200,estresse:+2}},
-  {t:"Ouvir e pensar depois", efeito:{estresse:+1,felicidade:+1}},
-  {t:"Recusar com educação", efeito:{rel_amigos:-2,felicidade:-1}},
-  {t:"Pedir um tempo", efeito:{estresse:-1}},
-  {t:"Dar uma resposta firme", efeito:{reputacao:+2,estresse:+3}},
-  {t:"Ignorar", efeito:{rel_amigos:-3,estresse:+2}},
-];
-function eventoVidaProcedural(){
-  const s = pick(G.sujeito);
-  const titulo = `${s[0].toUpperCase()+s.slice(1)} ${pick(G.pedido)}`;
-  const texto = `${pick(G.abertura)}, ${s} ${pick(G.pedido)} ${pick(G.motivo)}. ${pick(G.consequencia)}`;
-  const escolhas = shuffle(DECISOES_VIDA).slice(0,3);
-  return {
-    id:"proc_"+Math.random().toString(36).slice(2,8), peso:0, procedural:true,
-    titulo, texto,
-    opcoes: escolhas.map(d=>({t:d.t, efeito:d.efeito, log:`${d.t}: ${titulo.toLowerCase()}.`})),
-  };
-}
-
 // Calcula eventos extras de partida conforme tática, atributos e situação.
 function eventoExtraDePartida(pt){
   const cand = EVENTOS_PARTIDA_TIPO.filter(e=>{
@@ -811,6 +799,105 @@ const ARBITRAGENS = [
 ];
 
 // Lances: cada partida sorteia alguns deste pool, então o jogo muda de um para outro.
+/* ---------- Notícias geradas, sem repetir ---------- */
+const NOT_SUJEITO = ["O atacante","O volante","O goleiro","O lateral","O técnico","A diretoria","O presidente do clube","A torcida organizada","O departamento médico","O zagueiro","O ponta","O meia","O preparador físico","O roupeiro","O capitão"];
+const NOT_VERBO = ["acertou a renovação do contrato","falou pela primeira vez sobre a fase","foi elogiado pela imprensa","pediu mais tempo de treino","apareceu em uma entrevista de rádio","surpreendeu no treino de hoje","chamou atenção dos olheiros","comentou a derrota da semana","pediu desculpas por um lance","sentiu um desconforto no treino leve","começou a treinar com o grupo principal","foi cotado para a seleção sub-20","ganhou um prêmio de melhor do treino","recusou uma entrevista","ensinou um lance para a base"];
+const NOT_CONTEXTO = ["depois da última vitória","em meio à pressão por resultados","antes do próximo confronto","no fim de uma semana corrida","sem muita explicação","para surpresa dos torcedores","durante a visita de um patrocinador","com a imprensa de olho em cada treino"];
+const NOT_MODELOS = [
+  () => `${pick(NOT_SUJEITO)} ${pick(NOT_VERBO)} ${pick(NOT_CONTEXTO)}.`,
+  () => `Rumor: ${pick(CLUBES_LIGA)} estuda uma proposta por um jogador da base.`,
+  () => `${P.perfil.nome.split(" ")[0]} aparece na lista de promessas da região.`,
+  () => P.ultimoJogo ? `Após o jogo contra ${P.ultimoJogo.adv} (${P.ultimoJogo.placar[0]}x${P.ultimoJogo.placar[1]}), a imprensa comenta a atuação do time.` : `Comentaristas falam sobre a pré-temporada do ${P.carreira.clube}.`,
+  () => `Pesquisa mostra que ${pick(["a torcida","os fãs mais jovens","os sócios do clube"])} ${pick(["prefere","cobra","apoia"])} ${pick(["mais ataque","mais calma","mais disciplina","mais jogadores da base"])}.`,
+  () => `Empresário de ${pick(CLUBES_LIGA)} diz que acompanha ${P.perfil.nome.split(" ")[0]} de perto.`,
+  () => `${pick(["Chuva","Calor","Vento"])} forte deve marcar os próximos jogos, segundo a previsão.`,
+  () => `A cidade de ${P.perfil.cidade||"sua cidade"} organiza um dia de festa para a base do clube.`,
+  () => `Um vídeo de treino do ${P.carreira.clube} circula nas redes e chama atenção.`,
+  () => `${pick(NOT_SUJEITO)} de ${pick(CLUBES_LIGA)} é anunciado como novo reforço da base.`,
+  () => `Patrocinador ${pick(["de bebidas","de material esportivo","de transporte"])} escolhe ${P.carreira.clube} para ação na cidade.`,
+];
+function gerarNoticia(){
+  const usadas = new Set((P.noticias||[]).slice(0,60).map(n=>n.t));
+  for(let k=0;k<15;k++){
+    const item = Math.random()<0.7 ? {t:pick(NOT_MODELOS)(), fx:{}} : pick(NOTICIAS);
+    if(!usadas.has(item.t)) return item;
+  }
+  return null;
+}
+function geraNoticiaDoDia(){
+  if(Math.random() > CHANCE_NOTICIA_DIA) return;
+  const n = gerarNoticia(); if(!n) return;
+  P.noticias = P.noticias || [];
+  P.noticias.unshift({ t:n.t, dia:P.diaAbs, semana:P.semana, ano:P.ano });
+  if(P.noticias.length>60) P.noticias.pop();
+  aplicar(n.fx);
+}
+
+/* ---------- Eventos de vida, em combinações ---------- */
+const ASSUNTOS_VIDA = ["Uma dívida antiga voltou a ser cobrada","Um convite inesperado chegou pelo celular","Um amigo de infância precisa de ajuda","Chegou uma notícia sobre alguém da família","Um reencontro com um ex-colega do colégio","Um vizinho quer conversar sobre um negócio","Surgiu uma oferta de patrocínio pessoal","Um fã pediu para encontrar você no dia seguinte","Alguém vazou um vídeo antigo seu","Um antigo treinador da base ligou"];
+const DECISOES_VIDA = [
+  {t:"Ajudar com dinheiro", cond:s=>s.vida.dinheiro>1500, efeito:{dinheiro:-800,rel_amigos:+3,estresse:+1}},
+  {t:"Oferecer seu tempo", efeito:{rel_familia:+2,estresse:+2}},
+  {t:"Aceitar o convite", efeito:{felicidade:+4,forma:-3}},
+  {t:"Conversar com o treinador antes", cond:s=>s.rel.treinador>=40, fx:()=>{P.rel.treinador=clamp(P.rel.treinador+1,0,100);}, efeito:{estresse:-1}},
+  {t:"Dar uma resposta firme", efeito:{reputacao:+2,estresse:+3}},
+  {t:"Pedir um tempo para pensar", efeito:{estresse:-1}},
+  {t:"Ignorar por enquanto", efeito:{rel_amigos:-3,estresse:+2}},
+  {t:"Recusar com educação", efeito:{rel_amigos:-2,felicidade:-1}},
+  {t:"Usar sua lábia para sair bem", cond:s=>s.at.visao>=50, efeito:{reputacao:+2,felicidade:+1}},
+  {t:"Chamar um amigo para resolver", cond:s=>s.rel.amigos>=45, efeito:{rel_amigos:+2,estresse:-2}},
+  {t:"Cortar o contato de vez", efeito:{rel_familia:-3,estresse:-2}},
+  {t:"Ir pessoalmente até o local", efeito:{forma:-2,felicidade:+2,estresse:+1}},
+  {t:"Deixar para depois do treino", cond:s=>s.mente.disciplina>=50, efeito:{disciplina:+1}},
+  {t:"Consultar um advogado", cond:s=>s.vida.dinheiro>2500, efeito:{dinheiro:-400,estresse:-2}},
+];
+function eventoVidaProcedural(){
+  const s = pick(G.sujeito);
+  const usaAssunto = Math.random() < 0.45;
+  const titulo = usaAssunto ? pick(ASSUNTOS_VIDA) : `${s[0].toUpperCase()+s.slice(1)} ${pick(G.pedido)}`;
+  const texto = usaAssunto
+    ? `${pick(G.abertura)}. ${titulo}. ${pick(G.consequencia)}`
+    : `${pick(G.abertura)}, ${s} ${pick(G.pedido)} ${pick(G.motivo)}. ${pick(G.consequencia)}`;
+  const disponiveis = DECISOES_VIDA.filter(d=>{ try{ return !d.cond || d.cond(P); }catch{ return false; } });
+  const escolhas = shuffle(disponiveis).slice(0,3);
+  return {
+    id:"proc_"+Math.random().toString(36).slice(2,8), peso:0, procedural:true, titulo, texto,
+    opcoes: escolhas.map(d=>({t:d.t, efeito:d.efeito, fx:d.fx, log:`${d.t}: ${titulo.toLowerCase()}.`})),
+  };
+}
+
+/* ---------- Propostas de clubes e entrevistas ---------- */
+function gerarProposta(){
+  const clube = pick(CLUBES_LIGA.filter(n=>n!==P.carreira.clube));
+  const salario = Math.round(P.carreira.salario*1.4);
+  const motivo = pick(["A cidade é longe da sua família.","Eles prometem mais chances de jogar como titular.","O clube tem uma comissão técnica experiente.","Há um projeto de base forte e observadores de seleção.","O diretor pediu para conversar pessoalmente."]);
+  return {
+    id:"proposta_"+P.ano+"_"+P.diaAbs, titulo:`Proposta do ${clube}`,
+    texto:`O ${clube} quer contratar você. A oferta paga cerca de R$ ${salario}/mês, ${Math.round((salario/P.carreira.salario-1)*100)}% a mais que o atual. ${motivo}`,
+    opcoes:[
+      {t:`Aceitar e mudar para o ${clube}`, efeito:{reputacao:+3,felicidade:-2,rel_familia:-2}, fx:()=>{ P.carreira.clube=clube; P.carreira.salario=salario; const niv=DADOS.clubes.find(c=>c.nome===clube)?.nivel; if(niv) P.carreira.nivel=niv; }, log:`Você aceitou a proposta do ${clube}.`},
+      {t:"Ficar no clube atual", efeito:{felicidade:+2,rel_amigos:+3}, log:"Você decidiu ficar onde está."},
+      {t:"Negociar um salário maior", efeito:{estresse:+3}, fx:()=>{ if(Math.random()<0.5){ P.carreira.salario=Math.round(P.carreira.salario*1.2); log("O clube aceitou subir seu salário.","evento"); } else { P.mente.reputacao=clamp(P.mente.reputacao-1,0,100); log("O clube esfriou a negociação e a proposta perdeu força.","evento"); } }, log:"Você negociou com o clube atual."},
+    ]
+  };
+}
+function eventoEntrevista(res, nota){
+  const abre = res==="V" ? "Você venceu e a imprensa quer ouvir você logo após o apito."
+    : res==="E" ? "Empate em campo, e os repórteres querem saber o que deu errado."
+    : "A derrota pesa, e os jornalistas esperam uma resposta.";
+  const cena = pick(["Um repórter pergunta sobre a sua atuação.","Uma câmera está a poucos centímetros do seu rosto.","Um colega observa de longe, esperando a sua fala.","Um microfone da rádio local aparece na sua frente."]);
+  return {
+    id:"entrevista_"+P.diaAbs, titulo:"Entrevista após o jogo",
+    texto:`${abre} Sua nota foi ${nota}. ${cena}`,
+    opcoes:[
+      {t:"Elogiar o time", efeito:{felicidade:+2}, fx:()=>{ P.rel.treinador=clamp(P.rel.treinador+2,0,100); }, log:"Você elogiou o grupo na entrevista."},
+      {t:"Assumir a responsabilidade", efeito:{estresse:+3,reputacao:+2}, log:"Você assumiu os erros em público."},
+      {t:"Falar do seu desempenho", efeito:{reputacao:+3,felicidade:-1}, fx:()=>{ P.rel.amigos=clamp(P.rel.amigos-2,0,100); }, log:"Você falou de si mesmo e incomodou alguns colegas."},
+      {t:"Desconversar", efeito:{estresse:-2,reputacao:-1}, log:"Você desconversou."},
+    ]
+  };
+}
+
 const LANCES_POOL = [
   { id:"ataque_dir", tipo:"ataque", titulo:"Ataque pela direita", texto:"O ponta vem em velocidade e você recebe a bola no meio.",
     opcoes:[
@@ -855,10 +942,80 @@ const LANCES_POOL = [
     opcoes:[
       {t:"Reclamar com o árbitro", attr:"visao", base:0.45, acao:"reclama"},
       {t:"Levantar e seguir jogando", attr:"resistencia", base:0.85, acao:"segura"} ]},
-  { id:"reta", tipo:"fim", titulo:"Reta final", texto:"Faltam poucos minutos. O que você faz com o time?",
+  { id:"reta", tipo:"fim", titulo:"Reta final", texto:"Faltam poucos minutos. O que você faz com o time?", textos:["Faltam poucos minutos. O que você faz com o time?","O relógio passa dos 80 minutos. Hora de decidir o ritmo.","Último lance do jogo: atacar ou segurar o que tem?"],
     opcoes:[
       {t:"Atacar até o fim", attr:"resistencia", base:0.50, acao:"fim_ataque"},
       {t:"Segurar o resultado", attr:"defesa", base:0.65, acao:"fim_defesa"} ]},
+  { id:"contra_rapido", tipo:"ataque", titulo:"Contra-ataque seu", texto:"Você recupera a bola e o time tem dois contra um.",
+    textos:["Você recupera a bola e o time tem dois contra um.","A defesa adversária está desorganizada e você vê a saída livre."],
+    opcoes:[
+      {t:"Acelerar com a bola", attr:"velocidade", base:0.45, acao:"drible", risco:true},
+      {t:"Tocar para o companheiro livre", attr:"passe", base:0.60, acao:"passe"},
+      {t:"Chutar de longe", attr:"finalizacao", base:0.33, acao:"chute"} ]},
+  { id:"lateral_longo", tipo:"ataque", titulo:"Lateral longo", texto:"O lateral cobra longo para a área e o zagueiro vem sem marcação.",
+    textos:["O lateral cobra longo para a área e o zagueiro vem sem marcação.","A bola é lançada alta e cai no meio da área, disputada."],
+    opcoes:[
+      {t:"Cabecear de volta", attr:"velocidade", base:0.40, acao:"cabeca"},
+      {t:"Dominar com o peito", attr:"drible", base:0.45, acao:"drible", risco:true},
+      {t:"Deixar para o colega", attr:"passe", base:0.55, acao:"passe"} ]},
+  { id:"bola_nas_costas", tipo:"ataque", titulo:"Bola de costas", texto:"A bola chega de costas para o gol, com dois marcadores colados em você.",
+    textos:["A bola chega de costas para o gol, com dois marcadores colados em você.","Você protege a bola de costas e sente a pressão nas costas."],
+    opcoes:[
+      {t:"Girar e driblar", attr:"drible", base:0.36, acao:"drible", risco:true},
+      {t:"Tocar de primeira", attr:"passe", base:0.55, acao:"passe"},
+      {t:"Finalizar de costas", attr:"finalizacao", base:0.25, acao:"chute"} ]},
+  { id:"meia_lua", tipo:"ataque", titulo:"Espaço de longe", texto:"Você tem espaço para uma finalização de fora da área, mas o goleiro está adiantado.",
+    textos:["Você tem espaço para uma finalização de fora da área, mas o goleiro está adiantado.","A linha de marcação recuou e a frente da área está livre."],
+    opcoes:[
+      {t:"Chutar por cobertura", attr:"finalizacao", base:0.30, acao:"chute"},
+      {t:"Passar para quem chega", attr:"passe", base:0.52, acao:"passe"} ]},
+  { id:"chuva_escorregadia", tipo:"ataque", tags:["chuva"], titulo:"Gramado encharcado", texto:"O gramado molhado faz a bola correr mais do que você esperava.",
+    textos:["O gramado molhado faz a bola correr mais do que você esperava.","A bola escorrega no pé, e a jogada muda de ritmo com a chuva."],
+    opcoes:[
+      {t:"Chutar antes que a bola escape", attr:"finalizacao", base:0.26, acao:"chute"},
+      {t:"Tocar com cuidado", attr:"passe", base:0.46, acao:"passe"},
+      {t:"Driblar no molhado", attr:"drible", base:0.30, acao:"drible", risco:true} ]},
+  { id:"cruzamento_cabeca", tipo:"ataque", titulo:"Cruzamento na medida", texto:"O cruzamento vem na medida, mas você precisa subir mais que o zagueiro.",
+    textos:["O cruzamento vem na medida, mas você precisa subir mais que o zagueiro.","A bola cai alta e o zagueiro está colado em você."],
+    opcoes:[
+      {t:"Subir e cabecear", attr:"velocidade", base:0.42, acao:"cabeca"},
+      {t:"Deixar para o colega", attr:"passe", base:0.50, acao:"passe"} ]},
+  { id:"toque_profundo", tipo:"ataque", titulo:"Passe em profundidade", texto:"Um companheiro pede a bola no espaço, nas costas da defesa.",
+    textos:["Um companheiro pede a bola no espaço, nas costas da defesa.","O zagueiro abriu uma brecha e o lateral está correndo."],
+    opcoes:[
+      {t:"Lançar no espaço", attr:"visao", base:0.48, acao:"passe"},
+      {t:"Arrancar com a bola", attr:"drible", base:0.38, acao:"drible", risco:true} ]},
+  { id:"duelo_aereo", tipo:"defesa", titulo:"Bola alta na área", texto:"A bola alta chega na área, e você disputa de cabeça com o atacante.",
+    textos:["A bola alta chega na área, e você disputa de cabeça com o atacante.","Você sobe junto com o centroavante e não sabe quem vai ganhar."],
+    opcoes:[
+      {t:"Subir e disputar", attr:"defesa", base:0.52, acao:"marca", risco:true},
+      {t:"Recuar para cobrir", attr:"resistencia", base:0.68, acao:"recua"} ]},
+  { id:"toque_perigoso", tipo:"defesa", titulo:"Passe perigoso", texto:"O atacante tenta um passe em profundidade pelo meio.",
+    textos:["O atacante tenta um passe em profundidade pelo meio.","O meia adversário procura a diagonal entre os zagueiros."],
+    opcoes:[
+      {t:"Marcar o atacante", attr:"defesa", base:0.50, acao:"marca", risco:true},
+      {t:"Recuar para o meio", attr:"visao", base:0.70, acao:"recua"},
+      {t:"Pressionar a saída", attr:"velocidade", base:0.45, acao:"pressao", risco:true} ]},
+  { id:"escanteio_adv", tipo:"defesa", titulo:"Escanteio do adversário", texto:"O adversário cobra escanteio, e você precisa marcar o cabeceador.",
+    textos:["O adversário cobra escanteio, e você precisa marcar o cabeceador.","A bola é cruzada na área cheia de marcações."],
+    opcoes:[
+      {t:"Marcar o cabeceador", attr:"defesa", base:0.55, acao:"marca", risco:true},
+      {t:"Ficar na linha", attr:"resistencia", base:0.72, acao:"recua"} ]},
+  { id:"penalti_duvida", tipo:"defesa", titulo:"Pênalti duvidoso", texto:"O árbitro marca pênalti contra você. Você reclama ou aceita?",
+    textos:["O árbitro marca pênalti contra você. Você reclama ou aceita?","A torcida pede pênalti do outro lado, mas o árbitro aponta para a sua área."],
+    opcoes:[
+      {t:"Reclamar com o árbitro", attr:"visao", base:0.42, acao:"reclama", risco:true},
+      {t:"Ficar calmo e recuar", attr:"resistencia", base:0.60, acao:"recua"} ]},
+  { id:"volta_defesa", tipo:"defesa", titulo:"Volta para a defesa", texto:"Você precisa voltar rápido para cobrir a diagonal do lateral.",
+    textos:["Você precisa voltar rápido para cobrir a diagonal do lateral.","O ponta adversário chega livre e você está a dez metros atrás."],
+    opcoes:[
+      {t:"Correr para marcar", attr:"velocidade", base:0.50, acao:"marca", risco:true},
+      {t:"Fechar o espaço", attr:"resistencia", base:0.70, acao:"recua"} ]},
+  { id:"chuva_defesa", tipo:"defesa", tags:["chuva"], titulo:"Escorregão na defesa", texto:"A chuva deixou a grama traiçoeira, e o atacante vem em velocidade.",
+    textos:["A chuva deixou a grama traiçoeira, e o atacante vem em velocidade.","O gramado encharcado faz você pensar duas vezes antes de dar o bote."],
+    opcoes:[
+      {t:"Dar o bote", attr:"defesa", base:0.42, acao:"marca", risco:true},
+      {t:"Recuar sem se arriscar", attr:"resistencia", base:0.62, acao:"recua"} ]},
 ];
 
 const TEXTOS = {
@@ -897,11 +1054,34 @@ const TEXTOS = {
 };
 const pickTxt = k => pick(TEXTOS[k] || ["..."]);
 
-function escolherLancesDaPartida(titular){
-  const pool = shuffle(LANCES_POOL.filter(l=>l.tipo!=="fim"));
+
+function pesoLance(l, pt){
+  let w = 1;
+  if(l.tipo==="ataque") w *= pt.tatica==="ofensiva" ? 1.8 : pt.tatica==="defensiva" ? 0.6 : 1;
+  if(l.tipo==="defesa") w *= pt.tatica==="defensiva" ? 1.8 : pt.tatica==="ofensiva" ? 0.6 : 1;
+  if(pt.instrucao==="gol" && l.tipo!=="defesa") w *= 1.2;
+  if(pt.instrucao==="equipe" && l.opcoes.some(o=>o.acao==="passe")) w *= 1.25;
+  if(pt.instrucao==="calma" && l.opcoes.some(o=>o.risco)) w *= 0.7;
+  if(l.tags?.includes("chuva")) w *= pt.clima.id==="chuva" ? 4 : 0.2;
+  const media = l.opcoes.reduce((s,o)=>s+(P.at[o.attr]??50),0)/l.opcoes.length;
+  w *= 1 + Math.max(0, media-50)/40;
+  if(P.corpo.forma<40 && l.opcoes.some(o=>o.risco)) w *= 0.7;
+  return Math.max(0.05, w);
+}
+function escolherLancesDaPartida(titular, pt){
+  const restantes = LANCES_POOL.filter(l=>l.tipo!=="fim");
   const quantidade = titular ? 5 : 3;
+  const escolhidos = [];
+  for(let k=0; k<quantidade && restantes.length; k++){
+    const pesos = restantes.map(l=>pesoLance(l, pt));
+    const total = pesos.reduce((a,b)=>a+b,0);
+    let x = Math.random()*total, idx = 0;
+    for(let i=0;i<restantes.length;i++){ x-=pesos[i]; if(x<=0){ idx=i; break; } }
+    const l = restantes.splice(idx,1)[0];
+    escolhidos.push({...l, texto: pick(l.textos || [l.texto])});
+  }
   const fim = LANCES_POOL.find(l=>l.id==="reta");
-  return [...pool.slice(0,quantidade), fim];
+  return [...escolhidos, {...fim, texto: pick(fim.textos || [fim.texto])}];
 }
 
 function iniciarPartida(){
@@ -913,7 +1093,7 @@ function iniciarPartida(){
     rodada: P.semana, adv, mandante: jogo[0]===P.carreira.clube,
     fase:"pre", tatica:null, instrucao:null,
     clima: pick(CLIMAS), arbitragem: pick(ARBITRAGENS), titular,
-    lancesDoJogo: escolherLancesDaPartida(titular),
+    lancesDoJogo: [],
     lance:0, palestraFeita:false, bonusAtq:0, bonusDef:0,
     gP:0, gA:0, gJ:0, asJ:0, cartoesJog:0, lesionouJog:false, log:[],
   };
@@ -926,6 +1106,8 @@ function escolherInstrucao(id){ P.partida.instrucao = id; salvar(); render(); }
 function comecarJogo(){
   const pt = P.partida;
   if(!pt || !pt.tatica || !pt.instrucao) return;
+  pt.lancesDoJogo = escolherLancesDaPartida(pt.titular, pt);
+  pt.intervalo = Math.floor(pt.lancesDoJogo.length/2);
   pt.fase = "jogo";
   salvar(); render();
 }
@@ -936,7 +1118,7 @@ function resolverPalestra(i){
   P.rel.treinador = clamp(P.rel.treinador + (p.treinador||0), 0, 100);
   if(p.felic) P.mente.felicidade = clamp(P.mente.felicidade + p.felic, 0, 100);
   if(p.estresse) P.mente.estresse = clamp(P.mente.estresse + p.estresse, 0, 100);
-  pt.log.push({titulo:"Intervalo", escolha:p.nome, texto:`Você fez uma palestra: ${p.nome.toLowerCase()}.`, placar:[pt.gP,pt.gA]});
+  pt.log.push({titulo:"Intervalo", escolha:p.nome, texto:pick([`Você fez uma palestra: ${p.nome.toLowerCase()}.`,`No vestiário, você aposta em ${p.nome.toLowerCase()}. O grupo ouve em silêncio.`,`Palavras duras no intervalo: ${p.nome.toLowerCase()}.`]), placar:[pt.gP,pt.gA]});
   pt.fase = "jogo";
   salvar(); render();
 }
@@ -1087,6 +1269,7 @@ function finalizarPartida(){
   P.resultados[pt.rodada] = `${pt.gP}x${pt.gA}`;
   P.ultimoJogo = { adv:pt.adv, placar:[pt.gP,pt.gA], res, nota:nota.toFixed(1), gj:pt.gJ, asj:pt.asJ, clima:pt.clima.nome, arbitragem:pt.arbitragem.nome, lesao: pt.lesionouJog, log: pt.log };
   log(`Partida vs ${pt.adv}: ${pt.gP}x${pt.gA}. Nota ${nota.toFixed(1)}.`, "jogo");
+  if(!P.eventoAtual && Math.random() < (res==="D"?0.35:0.4)) P.eventoAtual = eventoEntrevista(res, nota.toFixed(1));
   P.jogoFeito = chaveSemana();
   P.partida = null;
   salvar(); render();
@@ -1162,14 +1345,6 @@ const NOTICIAS = [
   {t:"Pesquisa aponta que o público mais jovem acompanha o clube pelas redes.", fx:{}},
   {t:"Clube anuncia novo uniforme de treino.", fx:{}},
 ];
-function geraNoticiaDoDia(){
-  if(Math.random() > CHANCE_NOTICIA_DIA) return;
-  const n = pick(NOTICIAS);
-  P.noticias = P.noticias || [];
-  P.noticias.unshift({ t:n.t, dia:P.diaAbs, semana:P.semana, ano:P.ano });
-  if(P.noticias.length>40) P.noticias.pop();
-  aplicar(n.fx);
-}
 
 /* ---------- Compras ---------- */
 function comprar(tipo, id){
@@ -1198,7 +1373,7 @@ function atividade(id){
   aplicar(e);
   if(id==="fisio" && P.lesao){ P.lesao.dias = Math.max(1, P.lesao.dias-2); }
   P.diaAtividade = P.diaAbs;
-  log(`${a.nome}: ${a.desc}`, "atividade");
+  log(pick(FRASES_ATIVIDADE[id] || [`${a.nome}: ${a.desc}`]), "atividade");
   salvar(); render();
 }
 
@@ -1232,9 +1407,11 @@ function fecharTemporada(){
     opcoes:[
       {t:`Aceitar a proposta (+${Math.round(ganhoBase*100)}%)`, efeito:{}, fx:()=>{ P.carreira.salario = Math.round(P.carreira.salario*(1+ganhoBase)); }, log:"Você renovou o contrato."},
       {t:"Pedir um aumento maior", efeito:{estresse:+4}, sorte:{p:0.5,ganho:0,perda:0}, fx:()=>{ const sobe = Math.random()<0.5; P.carreira.salario = Math.round(P.carreira.salario*(sobe?1+ganhoBase*2:1)); }, log:"Você negociou com dureza."},
-      {t:"Recusar e buscar outro clube", efeito:{reputacao:+2,felicidade:-3}, log:"Você recusou e vai procurar outro clube."},
+      {t:"Recusar e buscar outro clube", efeito:{reputacao:+2,felicidade:-3}, fx:()=>{ P.filaEventos=P.filaEventos||[]; P.filaEventos.push(gerarProposta()); }, log:"Você recusou e vai procurar outro clube."},
     ]
   };
+  P.filaEventos = P.filaEventos || [];
+  if(pos<=5 || P.mente.reputacao>=30) P.filaEventos.push(gerarProposta());
 }
 
 function avancarDia(){
@@ -1247,6 +1424,7 @@ function avancarDia(){
   }
   if(P.dia > 7){ P.dia = 1; fecharSemana(); }
   geraNoticiaDoDia();
+  if(!P.eventoAtual && P.filaEventos && P.filaEventos.length){ P.eventoAtual = P.filaEventos.shift(); }
   if(P.dia !== DIA_JOGO && !P.eventoAtual && Math.random() < CHANCE_EVENTO_DIA){
     const ev = sortearEvento();
     if(ev){ P.eventoAtual = ev; P.cooldown[ev.id] = P.diaAbs; }
@@ -1742,6 +1920,7 @@ if(P){
   P.noticias = P.noticias || []; P.lesao = P.lesao || null;
   P.cartoes = P.cartoes || 0; P.suspenso = !!P.suspenso;
   P.resultados = P.resultados || {};
+  P.filaEventos = P.filaEventos || [];
 }
 render();
 </script>
